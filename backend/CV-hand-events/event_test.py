@@ -9,7 +9,7 @@ from PIL import Image, ImageTk
 
 # ---------------- Configuration (tune these) ----------------
 MIRROR_X = True  # Mirror camera feed horizontally (selfie mode)
-CAM_INDEX = 1
+CAM_INDEX = 0
 CAM_WIDTH = 3840
 CAM_HEIGHT = 2160
 CAM_FPS = 30

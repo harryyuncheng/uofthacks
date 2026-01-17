@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react'
 import DraggableWidget from '../components/Widget'
 
-function Time() {
+interface TimeProps {
+  gestureX?: number
+  gestureY?: number
+  gestureState?: 'OPEN' | 'CLOSED' | 'UNKNOWN'
+  gestureDefinitive?: boolean
+}
+
+function Time({ gestureX, gestureY, gestureState, gestureDefinitive }: TimeProps) {
   const [time, setTime] = useState(new Date())
 
   useEffect(() => {
@@ -25,6 +32,10 @@ function Time() {
     <DraggableWidget
       initialX={window.innerWidth / 2}
       initialY={40}
+      gestureX={gestureX}
+      gestureY={gestureY}
+      gestureState={gestureState}
+      gestureDefinitive={gestureDefinitive}
       style={{
         color: 'white',
         fontSize: '48px',

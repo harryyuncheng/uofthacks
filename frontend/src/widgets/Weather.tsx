@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react'
 import DraggableWidget from '../components/Widget'
 
+interface WeatherProps {
+  gestureX?: number
+  gestureY?: number
+  gestureState?: 'OPEN' | 'CLOSED' | 'UNKNOWN'
+  gestureDefinitive?: boolean
+}
+
 interface WeatherData {
   temp: number
   condition: string
@@ -8,7 +15,7 @@ interface WeatherData {
   icon: string
 }
 
-function Weather() {
+function Weather({ gestureX, gestureY, gestureState, gestureDefinitive }: WeatherProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -101,6 +108,10 @@ function Weather() {
     <DraggableWidget
       initialX={window.innerWidth / 2}
       initialY={120}
+      gestureX={gestureX}
+      gestureY={gestureY}
+      gestureState={gestureState}
+      gestureDefinitive={gestureDefinitive}
       style={{
         color: 'white',
         fontSize: '32px',
