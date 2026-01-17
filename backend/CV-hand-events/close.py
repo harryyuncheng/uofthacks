@@ -16,7 +16,7 @@ def clamp01(v): return max(0.0, min(1.0, v))
 
 def landmarks_to_px(hand_lms, w, h):
     pts = []
-    for lm in hand_lms.landmark:
+    for lm in hand_lms.landmark: 
         x = int(clamp01(lm.x) * (w - 1))
         y = int(clamp01(lm.y) * (h - 1))
         pts.append((x, y))
