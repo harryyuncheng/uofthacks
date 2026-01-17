@@ -6,7 +6,7 @@ const __dirname = path.dirname(__filename);
 const isDev = process.env.NODE_ENV === 'development';
 function createWindow() {
     const mainWindow = new BrowserWindow({
-        width: 1200,
+        width: 1000,
         height: 800,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
