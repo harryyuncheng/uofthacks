@@ -29,10 +29,54 @@ CURSOR_SMOOTHING = 0.7  # exponential smoothing factor (0-1, higher = more smoot
 CURSOR_X_GAIN = 1.0  # horizontal sensitivity multiplier
 CURSOR_Y_GAIN = 1.0  # vertical sensitivity multiplier
 
+CLOSED_STABLE_FRAMES = 4
+closed_count = 0
+
+
 # ---------------- CV / Hand Utils ----------------
 mp_hands = mp.solutions.hands
 mp_draw = mp.solutions.drawing_utils
 TIP_IDS = {"thumb": 4, "index": 8, "middle": 12, "ring": 16, "pinky": 20}
+
+
+import cv2
+
+def pick_camera_index(prefer_4k=True, max_idx=10):
+    """Pick the best camera index. If prefer_4k, choose one that can do >= 3840x2160."""
+    candidates = []
+    for idx in range(max_idx):
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            cap.release()
+            continue
+
+        # try request 4K
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            cap.release()
+            continue
+
+        h, w = frame.shape[:2]
+        candidates.append((idx, w, h))
+        cap.release()
+
+    if not candidates:
+        raise RuntimeError("No cameras found.")
+
+    if prefer_4k:
+        # pick first >=4K, otherwise max resolution
+        for idx, w, h in candidates:
+            if w >= 3840 and h >= 2160:
+                return idx, candidates
+        # fallback highest pixel count
+        best = max(candidates, key=lambda t: t[1]*t[2])
+        return best[0], candidates
+
+    return candidates[0][0], candidates
 
 def dist(a, b):
     return math.hypot(a[0]-b[0], a[1]-b[1])
@@ -352,7 +396,12 @@ class HandUITest:
 def main():
     ui = HandUITest()
     
-    cap = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW)
+    cam_index, cams = pick_camera_index(prefer_4k=True, max_idx=10)
+    print("[INFO] Camera candidates:", cams)
+    print("[INFO] Using cam_index:", cam_index)
+
+    cap = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)
+
     if not cap.isOpened():
         raise RuntimeError("Could not open camera.")
     
