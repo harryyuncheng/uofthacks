@@ -2,10 +2,14 @@ import { useState, useEffect } from 'react'
 import DraggableWidget from '../components/Widget'
 
 interface WeatherProps {
+  id: string
   gestureX?: number
   gestureY?: number
   gestureState?: 'OPEN' | 'CLOSED' | 'UNKNOWN'
   gestureDefinitive?: boolean
+  onPositionUpdate?: (id: string, position: { id: string, x: number, y: number, width: number, height: number }) => void
+  checkCollision?: (id: string, x: number, y: number, width: number, height: number) => { x: number, y: number }
+  getOtherWidgets?: (id: string) => Array<{ id: string, x: number, y: number, width: number, height: number }>
 }
 
 interface WeatherData {
@@ -15,7 +19,7 @@ interface WeatherData {
   icon: string
 }
 
-function Weather({ gestureX, gestureY, gestureState, gestureDefinitive }: WeatherProps) {
+function Weather({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPositionUpdate, checkCollision, getOtherWidgets }: WeatherProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,32 +110,41 @@ function Weather({ gestureX, gestureY, gestureState, gestureDefinitive }: Weathe
 
   return (
     <DraggableWidget
+      id={id}
       initialX={window.innerWidth / 2}
-      initialY={120}
+      initialY={180}
       gestureX={gestureX}
       gestureY={gestureY}
       gestureState={gestureState}
       gestureDefinitive={gestureDefinitive}
+      onPositionUpdate={onPositionUpdate}
+      checkCollision={checkCollision}
+      getOtherWidgets={getOtherWidgets}
       style={{
         color: 'white',
-        fontSize: '32px',
+        fontSize: '12px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         fontWeight: '300',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'nowrap',
+        width: 'auto',
+        height: '80px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}
     >
       {loading ? (
         <div>Loading...</div>
       ) : error ? (
-        <div style={{ fontSize: '24px' }}>⚠️ {error}</div>
+        <div style={{ fontSize: '18px' }}>⚠️ {error}</div>
       ) : weather ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span style={{ fontSize: '48px' }}>{weather.icon}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '36px' }}>{weather.icon}</span>
           <div>
-            <div style={{ fontSize: '48px', fontWeight: '400' }}>
+            <div style={{ fontSize: '36px', fontWeight: '400' }}>
               {weather.temp}°C
             </div>
-            <div style={{ fontSize: '20px', opacity: 0.8 }}>
+            <div style={{ fontSize: '14px', opacity: 0.8 }}>
               {weather.condition} · {weather.location}
             </div>
           </div>
