@@ -2,4 +2,5 @@ mediapipe==0.10.21
 opencv-contrib-python
 opencv-python
 pillow
+websockets==13.1
 
