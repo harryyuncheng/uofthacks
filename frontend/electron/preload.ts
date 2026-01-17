@@ -1,11 +1,15 @@
-import { contextBridge, ipcRenderer } from 'electron';
+const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
   // Add any APIs you want to expose to the renderer process here
-  send: (channel: string, data: any) => {
+  send: (channel: string, data?: any) => {
     ipcRenderer.send(channel, data);
   },
   on: (channel: string, func: (...args: any[]) => void) => {
-    ipcRenderer.on(channel, (event, ...args) => func(...args));
+    const subscription = (event: any, ...args: any[]) => func(...args);
+    ipcRenderer.on(channel, subscription);
+    return () => {
+      ipcRenderer.removeListener(channel, subscription);
+    };
   },
 });

@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime
 import time, json, math
+import platform
 import cv2
 import mediapipe as mp
 import tkinter as tk
@@ -9,7 +10,7 @@ from PIL import Image, ImageTk
 
 # ---------------- Configuration (tune these) ----------------
 MIRROR_X = True  # Mirror camera feed horizontally (selfie mode)
-CAM_INDEX = 1
+CAM_INDEX = 0
 CAM_WIDTH = 3840
 CAM_HEIGHT = 2160
 CAM_FPS = 30
@@ -41,11 +42,22 @@ TIP_IDS = {"thumb": 4, "index": 8, "middle": 12, "ring": 16, "pinky": 20}
 
 import cv2
 
-def pick_camera_index(prefer_4k=True, max_idx=10): 
+def get_camera_backend():
+    """Get the appropriate camera backend for the current OS."""
+    system = platform.system()
+    if system == "Windows":
+        return cv2.CAP_DSHOW
+    elif system == "Darwin":  # macOS
+        return cv2.CAP_AVFOUNDATION
+    else:  # Linux and others
+        return cv2.CAP_V4L2 if system == "Linux" else cv2.CAP_ANY
+
+def pick_camera_index(prefer_4k=True, max_idx=10):
     """Pick the best camera index. If prefer_4k, choose one that can do >= 3840x2160."""
+    backend = get_camera_backend()
     candidates = []
     for idx in range(max_idx):
-        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+        cap = cv2.VideoCapture(idx, backend)
         if not cap.isOpened():
             cap.release()
             continue
@@ -400,7 +412,9 @@ def main():
     print("[INFO] Camera candidates:", cams)
     print("[INFO] Using cam_index:", cam_index)
 
-    cap = cv2.VideoCapture(cam_index, cv2.CAP_DSHOW)
+    backend = get_camera_backend()
+    print(f"[INFO] Using camera backend: {backend} on {platform.system()}")
+    cap = cv2.VideoCapture(cam_index, backend)
 
     if not cap.isOpened():
         raise RuntimeError("Could not open camera.")
