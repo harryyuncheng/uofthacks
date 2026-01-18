@@ -7,4 +7,10 @@ azure-cognitiveservices-speech
 python-dotenv
 openai
 elevenlabs
+pymongo
+python-dotenv
+pydantic
+pyserial
+dnspython
+certifi
 
