@@ -41,7 +41,7 @@ class Config:
     # Pinch classification (thumb tip <-> index tip), normalized by palm width
     # closed if pinch_norm <= pinch_close_th
     # open   if pinch_norm >= pinch_open_th
-    pinch_close_th: float = 0.60
+    pinch_close_th: float = 0.60 ## 0.10 diff
     pinch_open_th: float = 0.71 # increase by same delta
 
     # Optional gating by handedness confidence (proxy)
