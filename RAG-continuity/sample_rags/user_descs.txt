@@ -1,0 +1,29 @@
+Person 1 - Narrative baseline (not stated to Mirror explicitly):
+Goal = bench press 225 lbs
+Emerging identity signals = creative curiosity, novelty-seeking (violin, food)
+Noise = routine school days, repeated music habits
+
+Person 2 is a high-school–aged student who is generally strong academically but struggles with 
+math-related anxiety and confidence rather than ability. They value emotional safety, routine,
+and familiarity, especially during stress. They are cautious, introspective, and self-aware, but prone to overthinking and avoidance 
+behaviors like scrolling when overwhelmed. They enjoy comfort food, familiar music, 
+and low-pressure social interactions. Recently, they have begun experimenting with reflective writing
+as a coping mechanism and are slowly reframing success away from grades toward emotional regulation
+and confidence.
+
+
+Person 3 is a quiet, creatively inclined student (late high school / early university) who 
+experiences social anxiety specifically around speaking in public or semi-public settings. 
+They are observant, sensitive to atmosphere, and strongly affected by tone, lighting, sound, 
+and perceived judgment. They process emotions through writing and creative expression rather 
+than direct conversation. Their primary goal is to speak more confidently in academic
+and social environments—not to become extroverted, but to reduce the internal friction and fear that
+prevents them from expressing ideas they already have. They value authenticity, aesthetics, and 
+low-pressure environments, and they are more motivated by internal alignment than external
+validation. They are often underestimated because they appear quiet, but they have a rich
+inner life.
+
+
+ALl files are labelled in some form of pXsY, where X is the person # (so either person 1, 2 or 3)
+and Y is the mirror session # they had, with 5th being their last session after around a 
+few weeks of improvements, speaking a week and a half in between, for example.

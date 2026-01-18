@@ -1,6 +1,7 @@
-sounddevice
-scipy
-openai-whisper
-vosk
-google-generativeai
-# outside venv; choco install ffmpeg -y
+# sounddevice
+# scipy
+# openai-whisper
+# vosk
+# google-genai
+# # outside venv; choco install ffmpeg -y
+backboard-sdk
