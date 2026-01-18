@@ -5,7 +5,6 @@ import Calendar from './widgets/Calendar'
 import Cursor from './components/Cursor'
 import { useGestureTracking } from './hooks/useGestureTracking'
 import { useEffect, useState, useCallback } from 'react'
-import { useNFCListener } from './hooks/useNFCListener'
 
 interface WidgetPosition {
   id: string
@@ -17,23 +16,31 @@ interface WidgetPosition {
 
 function App() {
   const { hand, isConnected } = useGestureTracking()
-  const nfcEvent = useNFCListener();
   const [widgetPositions, setWidgetPositions] = useState<Map<string, WidgetPosition>>(new Map())
+  const [session, setSession] = useState<any>(null); // Track session data
   
   useEffect(() => {
-     if (nfcEvent) {
-         console.log("App received NFC Event:", nfcEvent);
-         // Visual Feedback or State Logic will go here
-         if (nfcEvent.type === 'session_start') {
-             // Example: Play a sound or change border color
-             // const user = nfcEvent.user;
-             // alert(`Welcome ${user.name}`);
-         }
-     }
-  }, [nfcEvent]);
-  
-  useEffect(() => {
-    console.log('[APP] Mounted - checking window.electron:', !!window.electron);
+    console.log('[APP] Mounted - checking window.electron:', !!(window as any).electron);
+    
+    // Listen for NFC login events
+    const removeListener = (window as any).electron?.on('nfc-event', (data: any) => {
+      console.log("React received NFC:", data);
+      setSession(data);
+      
+      // Calculate context/prompt for the Voice AI
+      const userName = data.user?.name || "User";
+      const goals = data.goals ? data.goals.map((g:any) => g.title).join(", ") : "general improvement";
+      const prompt = `You are a specific, motivating AI Coach for ${userName}. Current goals: ${goals}. Context: ${data.rag_context || 'None'}. Be concise, supportive, and action-oriented.`;
+      
+      const greeting = data.welcome_message || `Welcome back ${userName}. Let's get to work.`;
+      
+      // Trigger backend voice service
+      (window as any).electron?.send('start-voice-chat', { prompt, greeting });
+    });
+
+    return () => {
+      if (removeListener) removeListener();
+    }
   }, []);
   
   useEffect(() => {
@@ -111,7 +118,8 @@ function App() {
       width: '100vw',
       height: '100vh',
       backgroundColor: '#000',
-      position: 'relative'
+      position: 'relative',
+      overflow: 'hidden',
     }}>
       {/* Connection status indicator */}
       <div style={{
@@ -182,8 +190,8 @@ function App() {
         checkCollision={checkCollision}
         getOtherWidgets={getOtherWidgets}
       />
-      <Calendar 
-        id="calendar-widget"
+      <Calendar
+        id="calendar"
         gestureX={hand?.x}
         gestureY={hand?.y}
         gestureState={hand?.state}

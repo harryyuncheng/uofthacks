@@ -1,34 +1,47 @@
 """
 RAG System for Coach context.
-Connects to Pinecone (Vector DB) and OpenAI (Embeddings).
+Connects to Pinecone (Vector DB) and uses Local Embeddings (Sentence Transformers).
 """
 import os
-import openai
 from pinecone import Pinecone
+from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
+
+# Load environment variables from .env file (try multiple locations)
+load_dotenv() 
+if not os.getenv("PINECONE_API_KEY"):
+    load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 
 # Configuration
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") # Ensure this is set in environment
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY") 
 PINECONE_INDEX_NAME = "coach-memory"
 
 # Initialize Clients
 try:
-    openai.api_key = OPENAI_API_KEY
+    # Use a small, fast local model (384 dimensions)
+    # Note: If your Pinecone index is 1536 dim (OpenAI), this will crash.
+    # We will assume you will create a NEW index or we pad the vector.
+    # For simplicity, let's use a model that matches or just handle the mismatch check.
+    # OpenAI is 1536. 'all-MiniLM-L6-v2' is 384. 
+    # To drop OpenAI completely, re-create Pinecone index with dim=384.
+    embed_model = SentenceTransformer('all-MiniLM-L6-v2') 
+    
     pc = Pinecone(api_key=PINECONE_API_KEY)
-    index = pc.Index(PINECONE_INDEX_NAME)
+    index = pc.Index(name=PINECONE_INDEX_NAME) 
 except Exception as e:
     print(f"[RAG ERROR] Failed to init clients: {e}")
     index = None
+    embed_model = None
+
+# ...existing code...
 
 def get_embedding(text: str):
-    """Generates embedding vector for query."""
-    response = openai.embeddings.create(
-        input=text,
-        model="text-embedding-3-small"
-    )
-    return response.data[0].embedding
+    """Generates embedding vector utilizing local CPU."""
+    if not embed_model: return []
+    return embed_model.encode(text).tolist()
 
 def get_rag_context(user_id: str, query: str = "current focus") -> list:
+
     """
     Retrieves relevant memories from Pinecone based on user_id and query.
     """

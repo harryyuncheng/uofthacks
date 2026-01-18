@@ -2,14 +2,23 @@ import os
 import queue
 import time
 import threading
+import sys
+import argparse
+import io
 import azure.cognitiveservices.speech as speechsdk
 from openai import OpenAI
 from dotenv import load_dotenv
 from elevenlabs import stream
 from elevenlabs.client import ElevenLabs
 
-# Load environment variables
+# Use simpleaudio for playback as a fallback if mpv fails in 'stream'
+import simpleaudio as sa
+from pydub import AudioSegment
+
+# Load environment variables (look in root/parent dirs)
 load_dotenv()
+if not os.getenv("ELEVENLABS_API_KEY"):
+    load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 
 # Configuration
 # Ensure you have these in your .env file:
@@ -77,7 +86,29 @@ def get_complete_utterance(timeout=1):
             
     return " ".join(accumulated_text)
 
-def process_conversations(speech_recognizer):
+def play_audio_bytes(audio_bytes):
+    """
+    Plays audio bytes using simpleaudio/pydub to avoid mpv dependency.
+    """
+    try:
+        # Convert MP3 bytes from ElevenLabs to WAV/PCM
+        sound = AudioSegment.from_file(io.BytesIO(audio_bytes), format="mp3")
+        
+        # Play using simpleaudio directly from raw data
+        play_obj = sa.play_buffer(
+            sound.raw_data,
+            num_channels=sound.channels,
+            bytes_per_sample=sound.sample_width,
+            sample_rate=sound.frame_rate
+        )
+        play_obj.wait_done()
+    except Exception as e:
+        print(f"Error playing audio: {e}")
+        # Detailed pydub debug
+        import traceback
+        traceback.print_exc()
+
+def process_conversations(speech_recognizer, system_prompt="You are a helpful voice assistant. Keep your responses concise and conversational.", greeting=None):
     if not OPENROUTER_API_KEY:
         print("Warning: OPENROUTER_API_KEY not found. LLM features disabled.")
         return
@@ -88,10 +119,27 @@ def process_conversations(speech_recognizer):
     )
     
     conversation_history = [
-        {"role": "system", "content": "You are a helpful voice assistant. Keep your responses concise and conversational."}
+        {"role": "system", "content": system_prompt}
     ]
 
     print("Ready to chat! Speak into your microphone.")
+
+    # Speak greeting if provided
+    if greeting:
+        print(f"AI (Greeting): {greeting}")
+        if elevenlabs_client:
+            try:
+                # Use text_to_speech.convert which returns a generator of bytes
+                audio_stream = elevenlabs_client.text_to_speech.convert(
+                    text=greeting,
+                    voice_id="ljX1ZrXuDIIRVcmiVSyR", 
+                    model_id="eleven_turbo_v2_5"
+                )
+                # Consume generator (stream) into full bytes for simpleaudio playback
+                play_audio_bytes(b"".join(audio_stream))
+            except Exception as e:
+                print(f"Greeting Audio Error: {e}")
+        conversation_history.append({"role": "assistant", "content": greeting})
     
     while True:
         try:
@@ -141,12 +189,14 @@ def process_conversations(speech_recognizer):
                         current_buffer += chunk
                         # Heuristic: split on punctuation that suggests end of sentence
                         if len(current_buffer) > 4 and any(current_buffer.endswith(end) for end in [". ", "? ", "! ", ".\n", "?\n", "!\n", ".", "?", "!"]):
+                            # Generate full audio bytes instead of stream object
                             audio_stream = elevenlabs_client.text_to_speech.convert(
                                 text=current_buffer,
                                 voice_id="ljX1ZrXuDIIRVcmiVSyR", 
                                 model_id="eleven_turbo_v2_5"
                             )
-                            stream(audio_stream)
+                            # Consume generator
+                            play_audio_bytes(b"".join(audio_stream))
                             current_buffer = ""
                     
                     # Play any remaining text
@@ -156,7 +206,7 @@ def process_conversations(speech_recognizer):
                             voice_id="ljX1ZrXuDIIRVcmiVSyR",
                             model_id="eleven_turbo_v2_5"
                         )
-                        stream(audio_stream)
+                        play_audio_bytes(b"".join(audio_stream))
                 except Exception as e:
                     print(f"\nError with ElevenLabs stream: {e}")
 
@@ -187,19 +237,23 @@ def process_conversations(speech_recognizer):
             print(f"Error in conversation loop: {e}")
 
 def main():
+    parser = argparse.ArgumentParser(description='LLM Voice Chat')
+    parser.add_argument('--prompt', type=str, help='System prompt for the AI', default="You are a helpful voice assistant. Keep your responses concise and conversational.")
+    parser.add_argument('--greeting', type=str, help='Initial greeting to speak', default=None)
+    args = parser.parse_args()
+
     try:
-        recognizer = setup_speech_recognition()
+        # Start speech recognition first (to warm up mic)
+        speech_recognizer = setup_speech_recognition()
+        speech_recognizer.start_continuous_recognition()
         
-        # Start recognition in background
-        recognizer.start_continuous_recognition()
-        
-        # Run the conversation loop in the main thread
-        process_conversations(recognizer)
+        # Process the conversation loop
+        process_conversations(speech_recognizer, system_prompt=args.prompt, greeting=args.greeting)
         
     except KeyboardInterrupt:
         print("\nStopping...")
-        if 'recognizer' in locals():
-            recognizer.stop_continuous_recognition()
+        if 'speech_recognizer' in locals():
+            speech_recognizer.stop_continuous_recognition()
     except Exception as e:
         print(f"Error: {e}")
 

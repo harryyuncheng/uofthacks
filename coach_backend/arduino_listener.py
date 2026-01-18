@@ -1,9 +1,15 @@
+import os
 import sys 
 import json
 import serial
 import time
 import serial.tools.list_ports
 from session_loader import load_session
+from dotenv import load_dotenv
+
+load_dotenv()
+if not os.getenv("MONGO_URL"):
+    load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 
 # Configuration
 BAUD_RATE = 115200
@@ -52,16 +58,25 @@ def listen_for_nfc():
         try:
             if ser.in_waiting > 0:
                 line = ser.readline().decode('utf-8').strip()
-                if line.startswith("NFC_ID:"):
-                    raw_nfc = line.split(":")[1].strip()
-                    
-                    # Instead of just printing text, we load the full session
-                    # and output JSON for Electron to consume
-                    session_data = load_session(raw_nfc)
-                    
-                    # FLUSH is critical for Electron to see it immediately
-                    print(json.dumps(session_data))
-                    sys.stdout.flush() 
+                # Debug: print everything we hear to help diagnose
+                # print(f"DEBUG_SERIAL: {line}") 
+                
+                if "NFC_ID:" in line:
+                    # Robust parsing: find the part after NFC_ID:
+                    parts = line.split("NFC_ID:")
+                    if len(parts) > 1:
+                        raw_nfc = parts[1].strip()
+                        
+                        # Load Session with simplified message for TTS
+                        session_data = load_session(raw_nfc)
+                        
+                        # Ensure we have a speakable welcome message
+                        user_name = session_data.get("user", {}).get("name", "User")
+                        if not session_data.get("welcome_message"):
+                             session_data["welcome_message"] = f"Welcome back, {user_name}. Your session has been loaded."
+                        
+                        print(json.dumps(session_data))
+                        sys.stdout.flush()
                     
         except KeyboardInterrupt:
             break
