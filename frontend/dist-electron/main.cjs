@@ -9,6 +9,7 @@ const child_process_1 = require("child_process");
 const isDev = process.env.NODE_ENV === 'development';
 let mainWindow = null;
 let gestureProcess = null;
+let voiceProcess = null;
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
         width: 1000,
@@ -33,6 +34,49 @@ function createWindow() {
     mainWindow.webContents.on('did-finish-load', () => {
         console.log('[MAIN] Window finished loading, starting gesture tracking');
         startGestureTracking();
+        startVoiceTracking();
+    });
+}
+function startVoiceTracking() {
+    if (voiceProcess) {
+        console.log('[MAIN] Voice tracking already running');
+        return;
+    }
+    const voicePath = path_1.default.join(__dirname, '../../backend/Voice');
+    const scriptPath = path_1.default.join(voicePath, 'llm_voice_chat.py');
+    console.log('[MAIN] Starting voice tracking');
+    voiceProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+        cwd: voicePath,
+        env: { ...process.env, PYTHONUNBUFFERED: '1' } // Ensure env vars are passed
+    });
+    voiceProcess.stdout?.on('data', (data) => {
+        const lines = data.toString().split('\n').filter((line) => line.trim());
+        lines.forEach((line) => {
+            try {
+                // Look for JSON messages
+                if (line.trim().startsWith('{')) {
+                    const msg = JSON.parse(line);
+                    if (msg.type === 'voice') {
+                        console.log('[MAIN] Voice event:', msg);
+                        mainWindow?.webContents.send('voice-data', msg);
+                    }
+                }
+                else {
+                    // Forward other stdout as logs if needed, or ignore
+                    console.log('[VOICE OUT]', line);
+                }
+            }
+            catch (err) {
+                console.log('[VOICE OUT]', line);
+            }
+        });
+    });
+    voiceProcess.stderr?.on('data', (data) => {
+        console.log('[VOICE ERR]', data.toString().trim());
+    });
+    voiceProcess.on('exit', (code) => {
+        console.log(`[MAIN] Voice process exited with code ${code}`);
+        voiceProcess = null;
     });
 }
 function startGestureTracking() {

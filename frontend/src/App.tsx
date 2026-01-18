@@ -18,9 +18,21 @@ interface WidgetPosition {
 function App() {
   const { hand, isConnected } = useGestureTracking()
   const [widgetPositions, setWidgetPositions] = useState<Map<string, WidgetPosition>>(new Map())
+  const [isAwake, setIsAwake] = useState(false)
   
   useEffect(() => {
     console.log('[APP] Mounted - checking window.electron:', !!window.electron);
+    
+    // Listen for voice wake word
+    if (window.electron) {
+      const cleanup = window.electron.on('voice-data', (data: any) => {
+        console.log('[APP] Received voice data:', data);
+        if (data.status === 'wake_word_detected') {
+          setIsAwake(true);
+        }
+      });
+      return cleanup;
+    }
   }, []);
   
   useEffect(() => {
@@ -139,42 +151,46 @@ function App() {
       )}
 
       {/* Widgets with gesture support */}
-      <Time 
-        id="time-widget"
-        gestureX={hand?.x}
-        gestureY={hand?.y}
-        gestureState={hand?.state}
-        gestureDefinitive={hand?.definitive}
-        onPositionUpdate={updateWidgetPosition}
-        checkCollision={checkCollision}
-      />
-      <Weather 
-        id="weather-widget"
-        gestureX={hand?.x}
-        gestureY={hand?.y}
-        gestureState={hand?.state}
-        gestureDefinitive={hand?.definitive}
-        onPositionUpdate={updateWidgetPosition}
-        checkCollision={checkCollision}
-      />
-      <Calendar 
-        id="calendar-widget"
-        gestureX={hand?.x}
-        gestureY={hand?.y}
-        gestureState={hand?.state}
-        gestureDefinitive={hand?.definitive}
-        onPositionUpdate={updateWidgetPosition}
-        checkCollision={checkCollision}
-      />
-      <Checklist
-        id="checklist-widget"
-        gestureX={hand?.x}
-        gestureY={hand?.y}
-        gestureState={hand?.state}
-        gestureDefinitive={hand?.definitive}
-        onPositionUpdate={updateWidgetPosition}
-        checkCollision={checkCollision}
-      />
+      {isAwake && (
+        <>
+          <Time 
+            id="time-widget"
+            gestureX={hand?.x}
+            gestureY={hand?.y}
+            gestureState={hand?.state}
+            gestureDefinitive={hand?.definitive}
+            onPositionUpdate={updateWidgetPosition}
+            checkCollision={checkCollision}
+          />
+          <Weather 
+            id="weather-widget"
+            gestureX={hand?.x}
+            gestureY={hand?.y}
+            gestureState={hand?.state}
+            gestureDefinitive={hand?.definitive}
+            onPositionUpdate={updateWidgetPosition}
+            checkCollision={checkCollision}
+          />
+          <Calendar 
+            id="calendar-widget"
+            gestureX={hand?.x}
+            gestureY={hand?.y}
+            gestureState={hand?.state}
+            gestureDefinitive={hand?.definitive}
+            onPositionUpdate={updateWidgetPosition}
+            checkCollision={checkCollision}
+          />
+          <Checklist
+            id="checklist-widget"
+            gestureX={hand?.x}
+            gestureY={hand?.y}
+            gestureState={hand?.state}
+            gestureDefinitive={hand?.definitive}
+            onPositionUpdate={updateWidgetPosition}
+            checkCollision={checkCollision}
+          />
+        </>
+      )}
     </div>
   )
 }
