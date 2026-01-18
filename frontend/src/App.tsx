@@ -176,6 +176,16 @@ const checkCollision = useCallback((id: string, x: number, y: number, width: num
         checkCollision={checkCollision}
         getOtherWidgets={getOtherWidgets}
       />
+      <VoiceOrb 
+        id="orb"
+        gestureX={hand.x}
+        gestureY={hand.y}
+        gestureState={hand.state}
+        gestureDefinitive={hand.definitive}
+        onPositionUpdate={updateWidgetPosition}
+        checkCollision={checkCollision}
+        getOtherWidgets={getOtherWidgets}
+      />
     </div>
   )
 }
