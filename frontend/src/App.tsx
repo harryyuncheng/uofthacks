@@ -3,8 +3,10 @@ import Time from './widgets/Time'
 import Weather from './widgets/Weather'
 import Calendar from './widgets/Calendar'
 import Cursor from './components/Cursor'
+import AudioBorder from './components/AudioBorder'
 import { useGestureTracking } from './hooks/useGestureTracking'
 import { useEffect, useState, useCallback } from 'react'
+
 
 interface WidgetPosition {
   id: string
@@ -44,7 +46,7 @@ function App() {
     return widgets
   }, [widgetPositions])
 
-  const checkCollision = useCallback((id: string, x: number, y: number, width: number, height: number): { x: number, y: number } => {
+const checkCollision = useCallback((id: string, x: number, y: number, width: number, height: number): { x: number, y: number } => {
     let adjustedX = x
     let adjustedY = y
 
@@ -93,12 +95,7 @@ function App() {
   }, [widgetPositions])
 
   return (
-    <div style={{
-      width: '100vw',
-      height: '100vh',
-      backgroundColor: '#000',
-      position: 'relative'
-    }}>
+    <AudioBorder>
       {/* Connection status indicator */}
       <div style={{
         position: 'fixed',
@@ -178,7 +175,7 @@ function App() {
         checkCollision={checkCollision}
         getOtherWidgets={getOtherWidgets}
       />
-    </div>
+    </AudioBorder>
   )
 }
 
