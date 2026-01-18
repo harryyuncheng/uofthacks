@@ -4,14 +4,18 @@ import sys
 import queue
 import time
 import threading
+import uuid
+import certifi
+from datetime import datetime
+from pymongo import MongoClient
 import azure.cognitiveservices.speech as speechsdk
 from openai import OpenAI
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from elevenlabs import stream
 from elevenlabs.client import ElevenLabs
 
 # Load environment variables
-load_dotenv()
+load_dotenv(find_dotenv())
 
 # Configuration
 # Ensure you have these in your .env file:
@@ -21,6 +25,19 @@ SPEECH_REGION = os.getenv('SPEECH_REGION')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 OPENROUTER_MODEL = "google/gemini-2.5-flash-preview-09-2025"
+MONGO_URL = os.getenv("MONGO_URL")
+
+# MongoDB Setup
+mongo_client = None
+goals_collection = None
+if MONGO_URL:
+    try:
+        mongo_client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
+        db = mongo_client.get_database("totem_coach_db")
+        goals_collection = db.get_collection("goals")
+        print("Connected to MongoDB for goals.", file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: MongoDB connection failed: {e}", file=sys.stderr)
 
 # Initialize ElevenLabs client
 elevenlabs_client = None
@@ -109,7 +126,8 @@ def run_introduction_session(speech_recognizer):
 
     # Specific objectives for the intro session
     objectives = [
-        "Introduce yourself as Curtis, a helpful friend whose goal is to help the user fulfill their own goals, and immediately ask for the user's name to get to know them.",
+        "Introduce yourself as Curtis, a helpful friend whose goal is to help the user fulfill their own goals.",
+        "Ask for the user's name to get to know them.",
         "Ask the user for a list of their primary goals and what they hope to achieve with your help.",
         "Smoothly ask if the user has any goals left. If not, then exit the introduction mode, and go to normal coaching mode. Ask the user which goal they'd like to explore first."
     ]
@@ -235,12 +253,12 @@ def run_introduction_session(speech_recognizer):
                 User Input: {u_text}
                 
                 Task:
-                1. Extract relevant information (Name, Goal, etc.)
-                2. If Objective Index is 2 (checking for more goals), determine if the user has MORE goals or is DONE.
+                1. Extract relevant information. Return "goals" as a list of strings if any new goals are mentioned.
+                2. If Objective Index is 3 (checking for more goals), determine if the user has MORE goals or is DONE.
                 
                 Return JSON format:
                 {{
-                    "extracted_data": {{ ... }},
+                    "extracted_data": {{ "goals": ["goal1", "goal2"] }},
                     "flow_control": "CONTINUE" | "LOOP_BACK_TO_GOALS" | "DONE"
                 }}
                 """
@@ -253,14 +271,63 @@ def run_introduction_session(speech_recognizer):
                         response_format={"type": "json_object"}
                     )
                      result = parse_completion.choices[0].message.content
+                     
+                     # Clean up potential markdown formatting
+                     if result.strip().startswith("```json"):
+                         result = result.strip().split("```json")[1]
+                         if result.strip().endswith("```"):
+                             result = result.strip()[:-3]
+                     elif result.strip().startswith("```"):
+                         result = result.strip().split("```")[1]
+                         if result.strip().endswith("```"):
+                             result = result.strip()[:-3]
+
                      parsed_json = json.loads(result)
-                     print(f"\n[Background Parser] Parsed: {parsed_json}")
+                     print(f"Parsed JSON: {parsed_json}", file=sys.stderr)
                      
-                     # TODO: Store extracted_data to MongoDB
-                     
+                     # Store extracted_data to MongoDB and emit event
+                     extracted_data = parsed_json.get("extracted_data", {})
+                     goals_data = extracted_data.get("goals", [])
+                     if not isinstance(goals_data, list):
+                         if isinstance(goals_data, str):
+                            goals_data = [goals_data]
+                         else:
+                            goals_data = []
+
+                     saved_goals = []
+                     if goals_data:
+                         for g_text in goals_data:
+                             # Always add to UI list
+                             saved_goals.append(g_text)
+                             
+                             # Try to save to DB in background
+                             if goals_collection is not None:
+                                 new_goal = {
+                                     "goal_id": str(uuid.uuid4()),
+                                     "user_id": "demo_user", # Placeholder
+                                     "title": g_text,
+                                     "description": "",
+                                     "progress": 0,
+                                     "status": "in-progress",
+                                     "subgoals": [],
+                                     "created_at": datetime.now()
+                                 }
+                                 try:
+                                     goals_collection.insert_one(new_goal)
+                                 except Exception as e:
+                                     print(f"Error inserting goal: {e}", file=sys.stderr)
+                        
+                         # Emit event to Electron
+                         if saved_goals:
+                             print(json.dumps({
+                                 "type": "voice", 
+                                 "status": "goals_updated", 
+                                 "goals": saved_goals
+                             }), flush=True)
+
                      return parsed_json
                 except Exception as e:
-                    print(f"Parser error: {e}")
+                    print(f"Parser error: {e}", file=sys.stderr)
                     return None
 
             # For the purpose of flow control, we might need to block or use a shared variable.
@@ -278,20 +345,16 @@ def run_introduction_session(speech_recognizer):
             parser_result = info_parser_worker(user_input, current_objective_index, assistant_response_text)
             
             # Decide next step logic
-            if current_objective_index == 1:
+            if current_objective_index == 2:
                 # We just asked for goals. Move to check if they have more
                 current_objective_index += 1
-            elif current_objective_index == 2:
+            elif current_objective_index == 3:
                 # We asked if they have more goals.
                 # Check parser result
                 flow = parser_result.get("flow_control", "DONE") if parser_result else "DONE"
                 if flow == "LOOP_BACK_TO_GOALS" or "yes" in user_input.lower(): # Fallback heuristic
-                    # Go back to asking for goals (Index 1)
-                    # Ideally, we should gently ask "What else?" - The objective text at Index 1 is "Ask for list of goals".
-                    # We might want to slightly modify it or just reuse it.
-                    # Or we stay at Index 2 but the AI context updates?
-                    # The prompt says "Objective 3 might loop back to Objective 2".
-                    current_objective_index = 1 
+                    # Go back to asking for goals (Index 2)
+                    current_objective_index = 2
                 else:
                     # Done with intro
                     current_objective_index += 1
@@ -437,7 +500,7 @@ def main():
         run_introduction_session(recognizer)
         
         # Optionally fall through to normal conversation if needed
-        # process_conversations(recognizer)
+        process_conversations(recognizer)
         
     except KeyboardInterrupt:
         print("\nStopping...")

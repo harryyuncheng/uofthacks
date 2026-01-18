@@ -58,19 +58,19 @@ function startVoiceTracking() {
     const lines = data.toString().split('\n').filter((line: string) => line.trim());
     lines.forEach((line: string) => {
       try {
+        // Log all output for debugging
+        console.log('[VOICE RAW]', line);
+        
         // Look for JSON messages
         if (line.trim().startsWith('{')) {
             const msg = JSON.parse(line);
             if (msg.type === 'voice') {
-                console.log('[MAIN] Voice event:', msg);
+                console.log('[MAIN] Voice event detected:', msg.status);
                 mainWindow?.webContents.send('voice-data', msg);
             }
-        } else {
-            // Forward other stdout as logs if needed, or ignore
-            console.log('[VOICE OUT]', line);
         }
       } catch (err) {
-        console.log('[VOICE OUT]', line);
+        // Ignore JSON parse errors for non-JSON lines
       }
     });
   });

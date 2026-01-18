@@ -18,10 +18,27 @@ interface TodoItem {
 }
 
 function Checklist({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPositionUpdate, checkCollision }: ChecklistProps) {
-  const [todos, setTodos] = useState<TodoItem[]>([
-    { id: '1', text: 'Daily Standup', completed: false },
-    { id: '2', text: 'Code Review', completed: false },
-  ])
+  const [todos, setTodos] = useState<TodoItem[]>([])
+
+  useEffect(() => {
+    if (window.electron) {
+      const cleanup = window.electron.on('voice-data', (data: any) => {
+        if (data.status === 'goals_updated' && Array.isArray(data.goals)) {
+          console.log('[Checklist] Received new goals:', data.goals);
+          
+          setTodos(prev => {
+            const newItems: TodoItem[] = data.goals.map((g: string) => ({
+              id: Date.now().toString() + Math.random().toString(),
+              text: g,
+              completed: false
+            }));
+            return [...prev, ...newItems];
+          });
+        }
+      });
+      return cleanup;
+    }
+  }, []);
 
   const toggleTodo = (todoId: string) => {
     setTodos(todos.map(todo => 
