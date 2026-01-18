@@ -116,7 +116,7 @@ function startGestureTracking() {
   gestureProcess.stdout?.on('data', (data) => {
     const lines = data.toString().split('\n').filter((line: string) => line.trim());
     
-    console.log(`[MAIN] Received ${lines.length} lines from gesture stream`);
+    // console.log(`[MAIN] Received ${lines.length} lines from gesture stream`);
     
     lines.forEach((line: string) => {
       try {
@@ -217,9 +217,8 @@ function startNFCService() {
 
 function startVoiceService(prompt: string, greeting: string) {
   if (voiceProcess) {
-    console.log('[MAIN] Stopping existing voice service...');
-    voiceProcess.kill();
-    voiceProcess = null;
+    console.log('[MAIN] Voice service already running. Ignoring new request.');
+    return;
   }
 
   const backendPath = path.join(__dirname, '../../backend');
@@ -228,14 +227,40 @@ function startVoiceService(prompt: string, greeting: string) {
   console.log('[MAIN] Starting voice service...');
   console.log('[MAIN] Greeting:', greeting);
 
-  voiceProcess = spawn('/Users/harry/anaconda3/bin/python', [
+  voiceProcess = spawn(PYTHON_PATH, [
     '-u', 
     scriptPath, 
     '--prompt', prompt,
     '--greeting', greeting
   ], {
     cwd: backendPath,
-    stdio: 'inherit' // Pipe output to parent console for debugging
+    env: { ...process.env, PYTHONUNBUFFERED: '1' }
+  });
+
+  voiceProcess.stdout?.on('data', (data) => {
+    const lines = data.toString().split('\n');
+    lines.forEach((line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      
+      console.log('[VOICE raw]', trimmed);
+      
+      try {
+        if (trimmed.startsWith('{')) {
+          const msg = JSON.parse(trimmed);
+          if (msg.type === 'voice') {
+            console.log('[MAIN] Voice event detected:', msg.status);
+            mainWindow?.webContents.send('voice-data', msg);
+          }
+        }
+      } catch (err) {
+        // Ignore non-JSON
+      }
+    });
+  });
+
+  voiceProcess.stderr?.on('data', (data) => {
+    console.log('[VOICE ERR]', data.toString().trim());
   });
 
   voiceProcess.on('exit', (code) => {

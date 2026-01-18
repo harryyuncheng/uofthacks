@@ -102,7 +102,7 @@ function startGestureTracking() {
     // Handle stdout (gesture data)
     gestureProcess.stdout?.on('data', (data) => {
         const lines = data.toString().split('\n').filter((line) => line.trim());
-        console.log(`[MAIN] Received ${lines.length} lines from gesture stream`);
+        // console.log(`[MAIN] Received ${lines.length} lines from gesture stream`);
         lines.forEach((line) => {
             try {
                 const gestureData = JSON.parse(line);
@@ -189,22 +189,45 @@ function startNFCService() {
 }
 function startVoiceService(prompt, greeting) {
     if (voiceProcess) {
-        console.log('[MAIN] Stopping existing voice service...');
-        voiceProcess.kill();
-        voiceProcess = null;
+        console.log('[MAIN] Voice service already running. Ignoring new request.');
+        return;
     }
     const backendPath = path_1.default.join(__dirname, '../../backend');
     const scriptPath = path_1.default.join(backendPath, 'Voice/llm_voice_chat.py');
     console.log('[MAIN] Starting voice service...');
     console.log('[MAIN] Greeting:', greeting);
-    voiceProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', [
+    voiceProcess = (0, child_process_1.spawn)(PYTHON_PATH, [
         '-u',
         scriptPath,
         '--prompt', prompt,
         '--greeting', greeting
     ], {
         cwd: backendPath,
-        stdio: 'inherit' // Pipe output to parent console for debugging
+        env: { ...process.env, PYTHONUNBUFFERED: '1' }
+    });
+    voiceProcess.stdout?.on('data', (data) => {
+        const lines = data.toString().split('\n');
+        lines.forEach((line) => {
+            const trimmed = line.trim();
+            if (!trimmed)
+                return;
+            console.log('[VOICE raw]', trimmed);
+            try {
+                if (trimmed.startsWith('{')) {
+                    const msg = JSON.parse(trimmed);
+                    if (msg.type === 'voice') {
+                        console.log('[MAIN] Voice event detected:', msg.status);
+                        mainWindow?.webContents.send('voice-data', msg);
+                    }
+                }
+            }
+            catch (err) {
+                // Ignore non-JSON
+            }
+        });
+    });
+    voiceProcess.stderr?.on('data', (data) => {
+        console.log('[VOICE ERR]', data.toString().trim());
     });
     voiceProcess.on('exit', (code) => {
         console.log(`[MAIN] Voice Process exited code: ${code}`);

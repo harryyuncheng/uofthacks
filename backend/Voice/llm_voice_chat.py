@@ -9,6 +9,7 @@ import argparse
 import io
 import uuid
 import certifi
+import fcntl
 from datetime import datetime
 from pymongo import MongoClient
 import azure.cognitiveservices.speech as speechsdk
@@ -517,6 +518,14 @@ def process_conversations(speech_recognizer, greeting=None, initial_history=None
             print(f"Error in conversation loop: {e}")
 
 def main():
+    # Ensure single instance
+    try:
+        lock_fd = open("/tmp/curtis.lock", 'w')
+        fcntl.lockf(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        print("Curtis is already running. Ignoring new instance.")
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description='LLM Voice Chat')
     parser.add_argument('--prompt', type=str, help='System prompt for the AI', default="You are a helpful voice assistant. Keep your responses concise and conversational.")
     parser.add_argument('--greeting', type=str, help='Initial greeting to speak', default=None)

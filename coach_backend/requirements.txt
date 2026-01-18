@@ -6,3 +6,4 @@ dnspython
 certifi
 pinecone
 sentence-transformers
+fi
