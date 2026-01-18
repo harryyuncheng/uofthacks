@@ -1,57 +1,60 @@
 from datetime import datetime
-from models import CoachProfile
-from db import coaches_collection
+from models import User, Totem, Goal, CoachType
+from db import users_collection, totems_collection, goals_collection
 
-def get_or_create_coach(nfc_id: str) -> dict:
+def get_or_create_user_by_nfc(nfc_id: str) -> dict:
     """
-    Retrieves an existing coach profile by NFC ID or creates a new one
-    if it doesn't exist.
+    1. Looks up Totem by NFC ID.
+    2. If found, returns the linked User.
+    3. If not found, creates a new User and a new Totem link.
+    Returns: User dict (with nfc_id injected for convenience)
     """
     
-    # Try to find existing coach
-    existing_coach = coaches_collection.find_one({"nfc_id": nfc_id})
+    # 1. Check Totem
+    totem = totems_collection.find_one({"nfc_id": nfc_id})
     
-    if existing_coach:
-        # Update last accessed time
-        coaches_collection.update_one(
-            {"nfc_id": nfc_id},
-            {"$set": {"last_accessed": datetime.now()}}
-        )
-        print(f"Found existing coach for NFC ID: {nfc_id}")
-        return existing_coach
+    if totem:
+        user_id = totem["user_id"]
+        user = users_collection.find_one({"user_id": user_id})
+        if user:
+            print(f"Found existing user {user.get('name')} for NFC {nfc_id}")
+            user["nfc_id"] = nfc_id # Inject for convenience
+            return user
+        else:
+            # Edge case: Totem exists but user deleted? Re-create user? 
+            # For now, treat as new.
+            pass
 
-    # Create new coach profile
-    print(f"Creating new coach for NFC ID: {nfc_id}")
-    new_coach = CoachProfile(nfc_id=nfc_id)
+    # 2. Create New
+    print(f"Creating new user for NFC ID: {nfc_id}")
     
-    # Default context is already set in the model ("You are a coach...")
+    new_user = User() # Generates user_id auto
+    new_totem = Totem(nfc_id=nfc_id, user_id=new_user.user_id)
     
-    # Insert into DB
-    result = coaches_collection.insert_one(new_coach.to_dict())
+    users_collection.insert_one(new_user.to_dict())
+    totems_collection.insert_one(new_totem.to_dict())
     
-    # Return existence confirmed created object (or query it back)
-    return coaches_collection.find_one({"_id": result.inserted_id})
+    result_user = new_user.to_dict()
+    result_user["nfc_id"] = nfc_id
+    return result_user
 
-def update_learned_context(nfc_id: str, new_info: str):
+def update_user_background(user_id: str, new_info: str):
     """
-    Appends new learned information to the user's context.
+    Appends new learned information to the user's background.
     """
-    # In a real app, this would append to a string or update a vector DB
-    # For now, we just append to the string field
-    coach = coaches_collection.find_one({"nfc_id": nfc_id})
-    if coach:
-        current_context = coach.get("learned_context", "")
-        updated_context = current_context + "\n" + new_info
+    user = users_collection.find_one({"user_id": user_id})
+    if user:
+        current_bg = user.get("background", "")
+        updated_bg = current_bg + "\n" + new_info if current_bg else new_info
         
-        coaches_collection.update_one(
-            {"nfc_id": nfc_id},
-            {"$set": {"learned_context": updated_context}}
+        users_collection.update_one(
+            {"user_id": user_id},
+            {"": {"background": updated_bg}}
         )
 
-def set_coach_type(nfc_id: str, type_str: str):
+def set_coach_type(user_id: str, type_str: str):
     """
     Sets the coach type (personal/corporate) and updates the system instruction.
-    type_str should be 'personal' or 'corporate'.
     """
     if type_str.lower() not in ["personal", "corporate"]:
         return False
@@ -62,9 +65,9 @@ def set_coach_type(nfc_id: str, type_str: str):
     else:
         s_prompt = "You are a Corporate Executive Coach. Focus on career growth, leadership, and productivity."
 
-    coaches_collection.update_one(
-        {"nfc_id": nfc_id},
-        {"$set": {
+    users_collection.update_one(
+        {"user_id": user_id},
+        {"": {
             "coach_type": type_str.lower(),
             "onboarding_completed": True,
             "system_instruction": s_prompt
@@ -72,18 +75,25 @@ def set_coach_type(nfc_id: str, type_str: str):
     )
     return True
 
-def add_goal(nfc_id: str, title: str, description: str = ""):
-    from models import Goal
-    goal = Goal(title=title, description=description)
-    
-    coaches_collection.update_one(
-        {"nfc_id": nfc_id},
-        {"$push": {"goals": goal.dict()}}
+def create_goal(user_id: str, title: str, description: str = "", deadline: datetime = None):
+    goal = Goal(
+        user_id=user_id, 
+        title=title, 
+        description=description, 
+        deadline=deadline
     )
+    goals_collection.insert_one(goal.to_dict())
+    return goal
+
+def get_user_goals(user_id: str):
+    return list(goals_collection.find({"user_id": user_id}))
 
 if __name__ == "__main__":
     # Test simulation
-    test_nfc_id = "0415A2C3" # Example hex UID from Arduino
+    test_nfc = "DEBUG_NFC_01"
     
-    coach = get_or_create_coach(test_nfc_id)
-    print("Coach Profile:", coach)
+    user = get_or_create_user_by_nfc(test_nfc)
+    print("User:", user)
+    
+    add_goal = create_goal(user["user_id"], "Learn React", "Build a dashboard")
+    print("Goal Created:", add_goal)
