@@ -55,7 +55,7 @@ def setup_speech_recognition():
     
     return speech_recognizer
 
-def get_complete_utterance(timeout=1.5):
+def get_complete_utterance(timeout=1):
     """
     Waits for text from the transcription queue. 
     Accumulates segments until silence (timeout) is detected.
