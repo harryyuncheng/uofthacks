@@ -2,12 +2,9 @@ import './App.css'
 import Time from './widgets/Time'
 import Weather from './widgets/Weather'
 import Calendar from './widgets/Calendar'
-import VoiceOrb from './widgets/VoiceOrb'
 import Cursor from './components/Cursor'
-import AudioBorder from './components/AudioBorder'
 import { useGestureTracking } from './hooks/useGestureTracking'
 import { useEffect, useState, useCallback } from 'react'
-
 
 interface WidgetPosition {
   id: string
@@ -47,7 +44,7 @@ function App() {
     return widgets
   }, [widgetPositions])
 
-const checkCollision = useCallback((id: string, x: number, y: number, width: number, height: number): { x: number, y: number } => {
+  const checkCollision = useCallback((id: string, x: number, y: number, width: number, height: number): { x: number, y: number } => {
     let adjustedX = x
     let adjustedY = y
 
@@ -96,7 +93,12 @@ const checkCollision = useCallback((id: string, x: number, y: number, width: num
   }, [widgetPositions])
 
   return (
-    <AudioBorder>
+    <div style={{
+      width: '100vw',
+      height: '100vh',
+      backgroundColor: '#000',
+      position: 'relative'
+    }}>
       {/* Connection status indicator */}
       <div style={{
         position: 'fixed',
@@ -172,16 +174,6 @@ const checkCollision = useCallback((id: string, x: number, y: number, width: num
         gestureY={hand?.y}
         gestureState={hand?.state}
         gestureDefinitive={hand?.definitive}
-        onPositionUpdate={updateWidgetPosition}
-        checkCollision={checkCollision}
-        getOtherWidgets={getOtherWidgets}
-      />
-      <VoiceOrb 
-        id="orb"
-        gestureX={hand.x}
-        gestureY={hand.y}
-        gestureState={hand.state}
-        gestureDefinitive={hand.definitive}
         onPositionUpdate={updateWidgetPosition}
         checkCollision={checkCollision}
         getOtherWidgets={getOtherWidgets}

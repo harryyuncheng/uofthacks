@@ -3,3 +3,6 @@ venv/
 CV-hand-events/logs/
 
 logs/
+.env
+
+Voice/__pycache__/
