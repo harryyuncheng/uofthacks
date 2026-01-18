@@ -9,6 +9,7 @@ const child_process_1 = require("child_process");
 const isDev = process.env.NODE_ENV === 'development';
 let mainWindow = null;
 let gestureProcess = null;
+let nfcProcess = null;
 let voiceProcess = null;
 function createWindow() {
     mainWindow = new electron_1.BrowserWindow({
@@ -32,8 +33,9 @@ function createWindow() {
     });
     // Start gesture tracking automatically when window is ready
     mainWindow.webContents.on('did-finish-load', () => {
-        console.log('[MAIN] Window finished loading, starting gesture tracking');
+        console.log('[MAIN] Window finished loading, starting services');
         startGestureTracking();
+        startNFCService();
         startVoiceTracking();
     });
 }
@@ -91,7 +93,7 @@ function startGestureTracking() {
     console.log('[MAIN] __dirname:', __dirname);
     // Spawn Python process (use full path to ensure correct environment)
     // -u flag forces unbuffered output
-    gestureProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+    gestureProcess = (0, child_process_1.spawn)('/Users/dganjali/.pyenv/shims/python', ['-u', scriptPath], {
         cwd: backendPath,
     });
     // Handle stdout (gesture data)
@@ -136,12 +138,85 @@ function stopGestureTracking() {
         gestureProcess = null;
     }
 }
+function startNFCService() {
+    if (nfcProcess) {
+        console.log('[MAIN] NFC service already running');
+        return;
+    }
+    const backendPath = path_1.default.join(__dirname, '../../coach_backend');
+    const scriptPath = path_1.default.join(backendPath, 'arduino_listener.py');
+    console.log('[MAIN] Starting NFC service...');
+    // Reuse same python path for consistency
+    nfcProcess = (0, child_process_1.spawn)('/Users/dganjali/.pyenv/shims/python', ['-u', scriptPath], {
+        cwd: backendPath,
+    });
+    nfcProcess.stdout?.on('data', (data) => {
+        // Unlike gestures which are high frequency, NFC events are rare.
+        // We can just parse the buffer string directly.
+        const output = data.toString().trim();
+        // Only log if it looks meaningful or debug is needed (filter raw info logs)
+        // console.log('[NFC RAW]', output); 
+        // It might output multiple JSONs if buffered, so split by newline
+        const lines = output.split('\n');
+        lines.forEach((line) => {
+            try {
+                if (!line)
+                    return;
+                // Filter out non-JSON debug lines to avoid cluttering error logs
+                if (!line.trim().startsWith('{')) {
+                    console.log('[NFC LOG]', line.trim());
+                    return;
+                }
+                const jsonData = JSON.parse(line);
+                console.log('[NFC EVENT]', jsonData);
+                mainWindow?.webContents.send('nfc-event', jsonData);
+            }
+            catch (e) {
+                // console.error('[NFC ERROR] Failed to parse:', line);
+            }
+        });
+    });
+    nfcProcess.stderr?.on('data', (data) => {
+        console.log('[NFC DEBUG]', data.toString().trim());
+    });
+    nfcProcess.on('exit', (code) => {
+        console.log(`[MAIN] NFC Process exited code: ${code}`);
+        nfcProcess = null;
+    });
+}
+function startVoiceService(prompt, greeting) {
+    if (voiceProcess) {
+        console.log('[MAIN] Stopping existing voice service...');
+        voiceProcess.kill();
+        voiceProcess = null;
+    }
+    const backendPath = path_1.default.join(__dirname, '../../backend');
+    const scriptPath = path_1.default.join(backendPath, 'Voice/llm_voice_chat.py');
+    console.log('[MAIN] Starting voice service...');
+    console.log('[MAIN] Greeting:', greeting);
+    voiceProcess = (0, child_process_1.spawn)('/Users/dganjali/.pyenv/shims/python', [
+        '-u',
+        scriptPath,
+        '--prompt', prompt,
+        '--greeting', greeting
+    ], {
+        cwd: backendPath,
+        stdio: 'inherit' // Pipe output to parent console for debugging
+    });
+    voiceProcess.on('exit', (code) => {
+        console.log(`[MAIN] Voice Process exited code: ${code}`);
+        voiceProcess = null;
+    });
+}
 // IPC handlers
 electron_1.ipcMain.on('start-gesture-tracking', () => {
     startGestureTracking();
 });
 electron_1.ipcMain.on('stop-gesture-tracking', () => {
     stopGestureTracking();
+});
+electron_1.ipcMain.on('start-voice-chat', (event, args) => {
+    startVoiceService(args.prompt, args.greeting);
 });
 electron_1.app.whenReady().then(() => {
     createWindow();
@@ -153,10 +228,16 @@ electron_1.app.whenReady().then(() => {
 });
 electron_1.app.on('window-all-closed', () => {
     stopGestureTracking();
+    if (voiceProcess) {
+        voiceProcess.kill();
+    }
     if (process.platform !== 'darwin') {
         electron_1.app.quit();
     }
 });
 electron_1.app.on('before-quit', () => {
     stopGestureTracking();
+    if (voiceProcess) {
+        voiceProcess.kill();
+    }
 });

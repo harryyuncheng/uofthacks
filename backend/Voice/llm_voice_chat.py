@@ -4,6 +4,9 @@ import sys
 import queue
 import time
 import threading
+import sys
+import argparse
+import io
 import uuid
 import certifi
 from datetime import datetime
@@ -14,8 +17,14 @@ from dotenv import load_dotenv, find_dotenv
 from elevenlabs import stream
 from elevenlabs.client import ElevenLabs
 
-# Load environment variables
-load_dotenv(find_dotenv())
+# Use simpleaudio for playback as a fallback if mpv fails in 'stream'
+import simpleaudio as sa
+from pydub import AudioSegment
+
+# Load environment variables (look in root/parent dirs)
+load_dotenv()
+if not os.getenv("ELEVENLABS_API_KEY"):
+    load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
 
 # Configuration
 # Ensure you have these in your .env file:
@@ -392,6 +401,23 @@ def process_conversations(speech_recognizer):
     ]
 
     print("Ready to chat! Speak into your microphone.")
+
+    # Speak greeting if provided
+    if greeting:
+        print(f"AI (Greeting): {greeting}")
+        if elevenlabs_client:
+            try:
+                # Use text_to_speech.convert which returns a generator of bytes
+                audio_stream = elevenlabs_client.text_to_speech.convert(
+                    text=greeting,
+                    voice_id="ljX1ZrXuDIIRVcmiVSyR", 
+                    model_id="eleven_turbo_v2_5"
+                )
+                # Consume generator (stream) into full bytes for simpleaudio playback
+                play_audio_bytes(b"".join(audio_stream))
+            except Exception as e:
+                print(f"Greeting Audio Error: {e}")
+        conversation_history.append({"role": "assistant", "content": greeting})
     
     while True:
         try:
@@ -441,12 +467,14 @@ def process_conversations(speech_recognizer):
                         current_buffer += chunk
                         # Heuristic: split on punctuation that suggests end of sentence
                         if len(current_buffer) > 4 and any(current_buffer.endswith(end) for end in [". ", "? ", "! ", ".\n", "?\n", "!\n", ".", "?", "!"]):
+                            # Generate full audio bytes instead of stream object
                             audio_stream = elevenlabs_client.text_to_speech.convert(
                                 text=current_buffer,
                                 voice_id="ljX1ZrXuDIIRVcmiVSyR", 
                                 model_id="eleven_turbo_v2_5"
                             )
-                            stream(audio_stream)
+                            # Consume generator
+                            play_audio_bytes(b"".join(audio_stream))
                             current_buffer = ""
                     
                     # Play any remaining text
@@ -456,7 +484,7 @@ def process_conversations(speech_recognizer):
                             voice_id="ljX1ZrXuDIIRVcmiVSyR",
                             model_id="eleven_turbo_v2_5"
                         )
-                        stream(audio_stream)
+                        play_audio_bytes(b"".join(audio_stream))
                 except Exception as e:
                     print(f"\nError with ElevenLabs stream: {e}")
 
@@ -487,11 +515,15 @@ def process_conversations(speech_recognizer):
             print(f"Error in conversation loop: {e}")
 
 def main():
+    parser = argparse.ArgumentParser(description='LLM Voice Chat')
+    parser.add_argument('--prompt', type=str, help='System prompt for the AI', default="You are a helpful voice assistant. Keep your responses concise and conversational.")
+    parser.add_argument('--greeting', type=str, help='Initial greeting to speak', default=None)
+    args = parser.parse_args()
+
     try:
-        recognizer = setup_speech_recognition()
-        
-        # Start recognition in background
-        recognizer.start_continuous_recognition()
+        # Start speech recognition first (to warm up mic)
+        speech_recognizer = setup_speech_recognition()
+        speech_recognizer.start_continuous_recognition()
         
         # 1. Wait for wake word
         wait_for_wake_word(recognizer)
@@ -504,8 +536,8 @@ def main():
         
     except KeyboardInterrupt:
         print("\nStopping...")
-        if 'recognizer' in locals():
-            recognizer.stop_continuous_recognition()
+        if 'speech_recognizer' in locals():
+            speech_recognizer.stop_continuous_recognition()
     except Exception as e:
         print(f"Error: {e}")
 

@@ -1,7 +1,15 @@
+import os
+import sys 
+import json
 import serial
 import time
 import serial.tools.list_ports
-from coach_manager import get_or_create_user_by_nfc, set_coach_type
+from session_loader import load_session
+from dotenv import load_dotenv
+
+load_dotenv()
+if not os.getenv("MONGO_URL"):
+    load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 
 # Configuration
 BAUD_RATE = 115200
@@ -49,39 +57,34 @@ def listen_for_nfc():
     while True:
         try:
             if ser.in_waiting > 0:
-                # Read line from serial
                 line = ser.readline().decode('utf-8').strip()
+                # Debug: print everything we hear to help diagnose
+                # print(f"DEBUG_SERIAL: {line}") 
                 
-                # Basic validation that it looks like a hex UID (e.g., "0415A2C3")
-                if line and len(line) >= 8: 
-                    print(f"Tag Detected: {line}")
-                    
-                    # Initialize or fetch the user via Totem link
-                    user = get_or_create_user_by_nfc(line)
-                    
-                    # Log essential info
-                    print(f"Active User: {user.get('name')}")
-                    print(f"User ID: {user.get('user_id')}")
-                    print(f"Type: {user.get('coach_type', 'unset')}")
-                    
-                    if not user.get('onboarding_completed'):
-                        print("ACTION REQUIRED: Ask user if they want 'personal' or 'corporate' coaching.")
-                        # Simulating setting it for demo purposes if you want, or wait for voice/UI command
-                    else:
-                        print(f"System: {user.get('system_instruction')}")
+                if "NFC_ID:" in line:
+                    # Robust parsing: find the part after NFC_ID:
+                    parts = line.split("NFC_ID:")
+                    if len(parts) > 1:
+                        raw_nfc = parts[1].strip()
                         
-        except KeyboardInterrupt:
-            print("\nStopping NFC Listener...")
-            break
-        except Exception as e:
-            print(f"Error: {e}")
-            time.sleep(1)
+                        # Load Session with simplified message for TTS
+                        session_data = load_session(raw_nfc)
+                        
+                        # Ensure we have a speakable welcome message
+                        user_name = session_data.get("user", {}).get("name", "User")
+                        if not session_data.get("welcome_message"):
+                             session_data["welcome_message"] = f"Welcome back, {user_name}. Your session has been loaded."
+                        
+                        print(json.dumps(session_data))
+                        sys.stdout.flush()
                     
         except KeyboardInterrupt:
-            print("\nStopping NFC Listener...")
             break
         except Exception as e:
-            print(f"Error: {e}")
+            # Send error as JSON too so frontend knows
+            error_msg = {"type": "error", "message": str(e)}
+            print(json.dumps(error_msg))
+            sys.stdout.flush()
             time.sleep(1)
 
 if __name__ == "__main__":

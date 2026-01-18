@@ -18,6 +18,29 @@ interface WidgetPosition {
 function App() {
   const { hand, isConnected } = useGestureTracking()
   const [widgetPositions, setWidgetPositions] = useState<Map<string, WidgetPosition>>(new Map())
+  const [session, setSession] = useState<any>(null); // Track session data
+  
+  useEffect(() => {
+    console.log('[APP] Mounted - checking window.electron:', !!(window as any).electron);
+    
+    // Listen for NFC login events
+    const removeListener = (window as any).electron?.on('nfc-event', (data: any) => {
+      console.log("React received NFC:", data);
+      setSession(data);
+      
+      // Calculate context/prompt for the Voice AI
+      const userName = data.user?.name || "User";
+      const goals = data.goals ? data.goals.map((g:any) => g.title).join(", ") : "general improvement";
+      const prompt = `You are a specific, motivating AI Coach for ${userName}. Current goals: ${goals}. Context: ${data.rag_context || 'None'}. Be concise, supportive, and action-oriented.`;
+      
+      const greeting = data.welcome_message || `Welcome back ${userName}. Let's get to work.`;
+      
+      // Trigger backend voice service
+      (window as any).electron?.send('start-voice-chat', { prompt, greeting });
+    });
+
+    return () => {
+      if (removeListener) removeListener();
   const [isAwake, setIsAwake] = useState(false)
   
   useEffect(() => {
@@ -100,7 +123,8 @@ function App() {
       width: '100vw',
       height: '100vh',
       backgroundColor: '#000',
-      position: 'relative'
+      position: 'relative',
+      overflow: 'hidden',
     }}>
       {/* Connection status indicator */}
       <div style={{
@@ -151,46 +175,36 @@ function App() {
       )}
 
       {/* Widgets with gesture support */}
-      {isAwake && (
-        <>
-          <Time 
-            id="time-widget"
-            gestureX={hand?.x}
-            gestureY={hand?.y}
-            gestureState={hand?.state}
-            gestureDefinitive={hand?.definitive}
-            onPositionUpdate={updateWidgetPosition}
-            checkCollision={checkCollision}
-          />
-          <Weather 
-            id="weather-widget"
-            gestureX={hand?.x}
-            gestureY={hand?.y}
-            gestureState={hand?.state}
-            gestureDefinitive={hand?.definitive}
-            onPositionUpdate={updateWidgetPosition}
-            checkCollision={checkCollision}
-          />
-          <Calendar 
-            id="calendar-widget"
-            gestureX={hand?.x}
-            gestureY={hand?.y}
-            gestureState={hand?.state}
-            gestureDefinitive={hand?.definitive}
-            onPositionUpdate={updateWidgetPosition}
-            checkCollision={checkCollision}
-          />
-          <Checklist
-            id="checklist-widget"
-            gestureX={hand?.x}
-            gestureY={hand?.y}
-            gestureState={hand?.state}
-            gestureDefinitive={hand?.definitive}
-            onPositionUpdate={updateWidgetPosition}
-            checkCollision={checkCollision}
-          />
-        </>
-      )}
+      <Time 
+        id="time-widget"
+        gestureX={hand?.x}
+        gestureY={hand?.y}
+        gestureState={hand?.state}
+        gestureDefinitive={hand?.definitive}
+        onPositionUpdate={updateWidgetPosition}
+        checkCollision={checkCollision}
+        getOtherWidgets={getOtherWidgets}
+      />
+      <Weather 
+        id="weather-widget"
+        gestureX={hand?.x}
+        gestureY={hand?.y}
+        gestureState={hand?.state}
+        gestureDefinitive={hand?.definitive}
+        onPositionUpdate={updateWidgetPosition}
+        checkCollision={checkCollision}
+        getOtherWidgets={getOtherWidgets}
+      />
+      <Calendar
+        id="calendar"
+        gestureX={hand?.x}
+        gestureY={hand?.y}
+        gestureState={hand?.state}
+        gestureDefinitive={hand?.definitive}
+        onPositionUpdate={updateWidgetPosition}
+        checkCollision={checkCollision}
+        getOtherWidgets={getOtherWidgets}
+      />
     </div>
   )
 }
