@@ -2,6 +2,7 @@ import './App.css'
 import Time from './widgets/Time'
 import Weather from './widgets/Weather'
 import Calendar from './widgets/Calendar'
+import Checklist from './widgets/Checklist'
 import Cursor from './components/Cursor'
 import { useGestureTracking } from './hooks/useGestureTracking'
 import { useEffect, useState, useCallback } from 'react'
@@ -40,6 +41,20 @@ function App() {
 
     return () => {
       if (removeListener) removeListener();
+  const [isAwake, setIsAwake] = useState(false)
+  
+  useEffect(() => {
+    console.log('[APP] Mounted - checking window.electron:', !!window.electron);
+    
+    // Listen for voice wake word
+    if (window.electron) {
+      const cleanup = window.electron.on('voice-data', (data: any) => {
+        console.log('[APP] Received voice data:', data);
+        if (data.status === 'wake_word_detected') {
+          setIsAwake(true);
+        }
+      });
+      return cleanup;
     }
   }, []);
   
@@ -54,16 +69,6 @@ function App() {
       return updated
     })
   }, [])
-
-  const getOtherWidgets = useCallback((id: string) => {
-    const widgets: WidgetPosition[] = []
-    for (const [otherId, pos] of widgetPositions) {
-      if (otherId !== id) {
-        widgets.push(pos)
-      }
-    }
-    return widgets
-  }, [widgetPositions])
 
   const checkCollision = useCallback((id: string, x: number, y: number, width: number, height: number): { x: number, y: number } => {
     let adjustedX = x

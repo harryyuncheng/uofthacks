@@ -13,7 +13,6 @@ interface DraggableWidgetProps {
   gestureDefinitive?: boolean
   onPositionUpdate?: (id: string, position: { id: string, x: number, y: number, width: number, height: number }) => void
   checkCollision?: (id: string, x: number, y: number, width: number, height: number) => { x: number, y: number }
-  getOtherWidgets?: (id: string) => Array<{ id: string, x: number, y: number, width: number, height: number }>
 }
 
 function DraggableWidget({ 
@@ -27,157 +26,13 @@ function DraggableWidget({
   gestureState,
   gestureDefinitive = false,
   onPositionUpdate,
-  checkCollision,
-  getOtherWidgets
+  checkCollision
 }: DraggableWidgetProps) {
   const [position, setPosition] = useState({ x: initialX, y: initialY })
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
-  const [snapLines, setSnapLines] = useState<Array<{ type: 'horizontal' | 'vertical', position: number }>>([])
   const widgetRef = useRef<HTMLDivElement>(null)
   const prevGestureState = useRef<'OPEN' | 'CLOSED' | 'UNKNOWN'>('UNKNOWN')
-
-  // Helper function to apply snapping to other widgets
-  const applySnapping = (x: number, y: number, width: number, height: number) => {
-    if (!getOtherWidgets || !isDragging) return { x, y, snapLines: [] }
-
-    const snapThreshold = 15 // pixels within which to snap
-    const otherWidgets = getOtherWidgets(id)
-    
-    let snappedX = x
-    let snappedY = y
-    const activeSnapLines: Array<{ type: 'horizontal' | 'vertical', position: number }> = []
-
-    // Current widget edges and center
-    const currentLeft = x - width / 2
-    const currentRight = x + width / 2
-    const currentTop = y - height / 2
-    const currentBottom = y + height / 2
-    const currentCenterX = x
-    const currentCenterY = y
-
-    // Screen center positions
-    const screenCenterX = window.innerWidth / 2
-    const screenCenterY = window.innerHeight / 2
-
-    let minXDist = Infinity
-    let minYDist = Infinity
-    let bestXSnapLine: { type: 'horizontal' | 'vertical', position: number } | null = null
-    let bestYSnapLine: { type: 'horizontal' | 'vertical', position: number } | null = null
-
-    // Check snapping to screen center (horizontal)
-    const screenCenterXDist = Math.abs(currentCenterX - screenCenterX)
-    if (screenCenterXDist < snapThreshold) {
-      snappedX = screenCenterX
-      minXDist = screenCenterXDist
-      bestXSnapLine = { type: 'vertical', position: screenCenterX }
-    }
-
-    // Check snapping to screen center (vertical)
-    const screenCenterYDist = Math.abs(currentCenterY - screenCenterY)
-    if (screenCenterYDist < snapThreshold) {
-      snappedY = screenCenterY
-      minYDist = screenCenterYDist
-      bestYSnapLine = { type: 'horizontal', position: screenCenterY }
-    }
-
-    for (const other of otherWidgets) {
-      const otherLeft = other.x - other.width / 2
-      const otherRight = other.x + other.width / 2
-      const otherTop = other.y - other.height / 2
-      const otherBottom = other.y + other.height / 2
-      const otherCenterX = other.x
-      const otherCenterY = other.y
-
-      // Horizontal snapping (vertical lines)
-      // Left to left
-      const leftToLeftDist = Math.abs(currentLeft - otherLeft)
-      if (leftToLeftDist < snapThreshold && leftToLeftDist < minXDist) {
-        snappedX = otherLeft + width / 2
-        minXDist = leftToLeftDist
-        bestXSnapLine = { type: 'vertical', position: otherLeft }
-      }
-
-      // Right to right
-      const rightToRightDist = Math.abs(currentRight - otherRight)
-      if (rightToRightDist < snapThreshold && rightToRightDist < minXDist) {
-        snappedX = otherRight - width / 2
-        minXDist = rightToRightDist
-        bestXSnapLine = { type: 'vertical', position: otherRight }
-      }
-
-      // Center to center (horizontal)
-      const centerToCenter = Math.abs(currentCenterX - otherCenterX)
-      if (centerToCenter < snapThreshold && centerToCenter < minXDist) {
-        snappedX = otherCenterX
-        minXDist = centerToCenter
-        bestXSnapLine = { type: 'vertical', position: otherCenterX }
-      }
-
-      // Left to right (current widget's left edge to other widget's right edge)
-      const leftToRightDist = Math.abs(currentLeft - otherRight)
-      if (leftToRightDist < snapThreshold && leftToRightDist < minXDist) {
-        snappedX = otherRight + width / 2  // Position center so left edge touches otherRight
-        minXDist = leftToRightDist
-        bestXSnapLine = { type: 'vertical', position: otherRight }
-      }
-
-      // Right to left (current widget's right edge to other widget's left edge)
-      const rightToLeftDist = Math.abs(currentRight - otherLeft)
-      if (rightToLeftDist < snapThreshold && rightToLeftDist < minXDist) {
-        snappedX = otherLeft - width / 2  // Position center so right edge touches otherLeft
-        minXDist = rightToLeftDist
-        bestXSnapLine = { type: 'vertical', position: otherLeft }
-      }
-
-      // Vertical snapping (horizontal lines)
-      // Top to top
-      const topToTopDist = Math.abs(currentTop - otherTop)
-      if (topToTopDist < snapThreshold && topToTopDist < minYDist) {
-        snappedY = otherTop + height / 2
-        minYDist = topToTopDist
-        bestYSnapLine = { type: 'horizontal', position: otherTop }
-      }
-
-      // Bottom to bottom
-      const bottomToBottomDist = Math.abs(currentBottom - otherBottom)
-      if (bottomToBottomDist < snapThreshold && bottomToBottomDist < minYDist) {
-        snappedY = otherBottom - height / 2
-        minYDist = bottomToBottomDist
-        bestYSnapLine = { type: 'horizontal', position: otherBottom }
-      }
-
-      // Center to center (vertical)
-      const centerToCenterY = Math.abs(currentCenterY - otherCenterY)
-      if (centerToCenterY < snapThreshold && centerToCenterY < minYDist) {
-        snappedY = otherCenterY
-        minYDist = centerToCenterY
-        bestYSnapLine = { type: 'horizontal', position: otherCenterY }
-      }
-
-      // Top to bottom (current widget's top edge to other widget's bottom edge)
-      const topToBottomDist = Math.abs(currentTop - otherBottom)
-      if (topToBottomDist < snapThreshold && topToBottomDist < minYDist) {
-        snappedY = otherBottom + height / 2  // Position center so top edge touches otherBottom
-        minYDist = topToBottomDist
-        bestYSnapLine = { type: 'horizontal', position: otherBottom }
-      }
-
-      // Bottom to top (current widget's bottom edge to other widget's top edge)
-      const bottomToTopDist = Math.abs(currentBottom - otherTop)
-      if (bottomToTopDist < snapThreshold && bottomToTopDist < minYDist) {
-        snappedY = otherTop - height / 2  // Position center so bottom edge touches otherTop
-        minYDist = bottomToTopDist
-        bestYSnapLine = { type: 'horizontal', position: otherTop }
-      }
-    }
-
-    // Only add the snap lines that are actually being used
-    if (bestXSnapLine) activeSnapLines.push(bestXSnapLine)
-    if (bestYSnapLine) activeSnapLines.push(bestYSnapLine)
-
-    return { x: snappedX, y: snappedY, snapLines: activeSnapLines }
-  }
 
   // Helper function to constrain position within boundaries
   const constrainPosition = (x: number, y: number) => {
@@ -187,13 +42,8 @@ function DraggableWidget({
     const halfWidth = rect.width / 2
     const halfHeight = rect.height / 2
 
-    // Apply snapping first
-    const snapped = applySnapping(x, y, rect.width, rect.height)
-    let constrainedX = snapped.x
-    let constrainedY = snapped.y
-
-    // Update snap lines visualization
-    setSnapLines(snapped.snapLines)
+    let constrainedX = x
+    let constrainedY = y
 
     // Clamp x and y to keep widget fully within viewport
     constrainedX = Math.max(halfWidth, Math.min(window.innerWidth - halfWidth, constrainedX))
@@ -270,7 +120,6 @@ function DraggableWidget({
 
     // Detect OPEN gesture (release) - transition from CLOSED to OPEN
     if (gestureState === 'OPEN' && prevState === 'CLOSED' && isDragging) {
-      setSnapLines([])
       setIsDragging(false)
       console.log('[WIDGET] Released gesture drag');
     }
@@ -312,31 +161,6 @@ function DraggableWidget({
 
   return (
     <>
-      {/* Snap guide lines */}
-      {isDragging && snapLines.map((line, idx) => (
-        <div
-          key={idx}
-          style={{
-            position: 'fixed',
-            ...(line.type === 'vertical' ? {
-              left: `${line.position}px`,
-              top: 0,
-              bottom: 0,
-              width: '1px',
-            } : {
-              top: `${line.position}px`,
-              left: 0,
-              right: 0,
-              height: '1px',
-            }),
-            backgroundColor: '#808080',
-            opacity: 0.5,
-            pointerEvents: 'none',
-            zIndex: 9999
-          }}
-        />
-      ))}
-
       <div 
         ref={widgetRef}
         onMouseDown={handleMouseDown}

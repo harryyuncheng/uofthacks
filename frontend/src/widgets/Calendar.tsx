@@ -9,7 +9,6 @@ interface CalendarProps {
   gestureDefinitive?: boolean
   onPositionUpdate?: (id: string, position: { id: string, x: number, y: number, width: number, height: number }) => void
   checkCollision?: (id: string, x: number, y: number, width: number, height: number) => { x: number, y: number }
-  getOtherWidgets?: (id: string) => Array<{ id: string, x: number, y: number, width: number, height: number }>
 }
 
 interface CalendarEvent {
@@ -21,7 +20,7 @@ interface CalendarEvent {
   location?: string
 }
 
-function Calendar({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPositionUpdate, checkCollision, getOtherWidgets }: CalendarProps) {
+function Calendar({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPositionUpdate, checkCollision }: CalendarProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [currentTime, setCurrentTime] = useState(new Date())
 
@@ -118,7 +117,6 @@ function Calendar({ id, gestureX, gestureY, gestureState, gestureDefinitive, onP
       gestureDefinitive={gestureDefinitive}
       onPositionUpdate={onPositionUpdate}
       checkCollision={checkCollision}
-      getOtherWidgets={getOtherWidgets}
       style={{
         color: 'white',
         fontFamily: 'system-ui, -apple-system, sans-serif',

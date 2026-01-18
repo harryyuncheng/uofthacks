@@ -9,10 +9,9 @@ interface TimeProps {
   gestureDefinitive?: boolean
   onPositionUpdate?: (id: string, position: { id: string, x: number, y: number, width: number, height: number }) => void
   checkCollision?: (id: string, x: number, y: number, width: number, height: number) => { x: number, y: number }
-  getOtherWidgets?: (id: string) => Array<{ id: string, x: number, y: number, width: number, height: number }>
 }
 
-function Time({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPositionUpdate, checkCollision, getOtherWidgets }: TimeProps) {
+function Time({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPositionUpdate, checkCollision }: TimeProps) {
   const [time, setTime] = useState(new Date())
 
   useEffect(() => {
@@ -42,7 +41,6 @@ function Time({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPosit
       gestureDefinitive={gestureDefinitive}
       onPositionUpdate={onPositionUpdate}
       checkCollision={checkCollision}
-      getOtherWidgets={getOtherWidgets}
       style={{
         color: 'white',
         fontSize: '24px',
