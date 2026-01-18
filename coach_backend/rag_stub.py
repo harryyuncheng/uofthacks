@@ -6,11 +6,11 @@ import os
 from pinecone import Pinecone
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
+from pathlib import Path
 
-# Load environment variables from .env file (try multiple locations)
-load_dotenv() 
-if not os.getenv("PINECONE_API_KEY"):
-    load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
+# Load from backend/.env (sibling directory)
+env_path = Path(__file__).resolve().parent.parent / "backend" / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # Configuration
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY") 

@@ -54,21 +54,6 @@ else:
 # Shared queue for transcribed text
 transcription_queue = queue.Queue()
 
-def wait_for_wake_word(speech_recognizer):
-    print("Listening for wake word 'Hey Amir'...", file=sys.stderr)
-    while True:
-        try:
-            # Check queue non-blocking or with short timeout
-            text = transcription_queue.get(timeout=0.1)
-            # print(f"Heard: {text}", file=sys.stderr)
-            if "amir" in text.lower(): # fuzzy match
-                 print(json.dumps({"type": "voice", "status": "wake_word_detected"}), flush=True)
-                 # Drain the queue so the onboarding doesn't process the wake word as input
-                 with transcription_queue.mutex:
-                     transcription_queue.queue.clear()
-                 return
-        except queue.Empty:
-            continue
 
 def setup_speech_recognition():
     if not SPEECH_KEY or not SPEECH_REGION:
@@ -542,9 +527,6 @@ def main():
         speech_recognizer = setup_speech_recognition()
         speech_recognizer.start_continuous_recognition()
         
-        # 1. Wait for wake word
-        wait_for_wake_word(speech_recognizer)
-
         # 2. Run the onboarding conversation
         history = run_introduction_session(speech_recognizer)
         

@@ -7,6 +7,8 @@ const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
 const child_process_1 = require("child_process");
 const isDev = process.env.NODE_ENV === 'development';
+// Use the local virtual environment Python
+const PYTHON_PATH = path_1.default.join(__dirname, '../../backend/venv/bin/python');
 let mainWindow = null;
 let gestureProcess = null;
 let nfcProcess = null;
@@ -36,7 +38,8 @@ function createWindow() {
         console.log('[MAIN] Window finished loading, starting services');
         startGestureTracking();
         startNFCService();
-        startVoiceTracking();
+        // Voice tracking is now started on demand (via NFC/IPC)
+        // startVoiceTracking();
     });
 }
 function startVoiceTracking() {
@@ -47,7 +50,7 @@ function startVoiceTracking() {
     const voicePath = path_1.default.join(__dirname, '../../backend/Voice');
     const scriptPath = path_1.default.join(voicePath, 'llm_voice_chat.py');
     console.log('[MAIN] Starting voice tracking');
-    voiceProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+    voiceProcess = (0, child_process_1.spawn)(PYTHON_PATH, ['-u', scriptPath], {
         cwd: voicePath,
         env: { ...process.env, PYTHONUNBUFFERED: '1' } // Ensure env vars are passed
     });
@@ -93,7 +96,7 @@ function startGestureTracking() {
     console.log('[MAIN] __dirname:', __dirname);
     // Spawn Python process (use full path to ensure correct environment)
     // -u flag forces unbuffered output
-    gestureProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+    gestureProcess = (0, child_process_1.spawn)(PYTHON_PATH, ['-u', scriptPath], {
         cwd: backendPath,
     });
     // Handle stdout (gesture data)
@@ -147,7 +150,7 @@ function startNFCService() {
     const scriptPath = path_1.default.join(backendPath, 'arduino_listener.py');
     console.log('[MAIN] Starting NFC service...');
     // Reuse same python path for consistency
-    nfcProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+    nfcProcess = (0, child_process_1.spawn)(PYTHON_PATH, ['-u', scriptPath], {
         cwd: backendPath,
     });
     nfcProcess.stdout?.on('data', (data) => {

@@ -43,23 +43,6 @@ function App() {
       if (removeListener) removeListener();
     };
   }, []);
-
-  const [isAwake, setIsAwake] = useState(false)
-  
-  useEffect(() => {
-    console.log('[APP] Mounted - checking window.electron:', !!window.electron);
-    
-    // Listen for voice wake word
-    if (window.electron) {
-      const cleanup = window.electron.on('voice-data', (data: any) => {
-        console.log('[APP] Received voice data:', data);
-        if (data.status === 'wake_word_detected') {
-          setIsAwake(true);
-        }
-      });
-      return cleanup;
-    }
-  }, []);
   
   useEffect(() => {
     console.log('[APP] Connection status:', isConnected);
@@ -179,9 +162,8 @@ function App() {
 
       {/* Widgets with gesture support */}
       <div style={{ 
-        opacity: isAwake ? 1 : 0, 
-        pointerEvents: isAwake ? 'auto' : 'none',
-        transition: 'opacity 0.5s ease-in-out'
+        opacity: 1, 
+        pointerEvents: 'auto',
       }}>
         <Time 
           id="time-widget"

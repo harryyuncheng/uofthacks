@@ -2,8 +2,11 @@ import os
 import certifi
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Load from backend/.env (sibling directory)
+env_path = Path(__file__).resolve().parent.parent / "backend" / ".env"
+load_dotenv(dotenv_path=env_path)
 
 MONGO_URL = os.getenv("MONGO_URL")
 

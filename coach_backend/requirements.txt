@@ -4,3 +4,5 @@ pydantic
 pyserial
 dnspython
 certifi
+pinecone
+sentence-transformers

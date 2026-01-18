@@ -4,6 +4,9 @@ import { spawn, ChildProcess } from 'child_process';
 
 const isDev = process.env.NODE_ENV === 'development';
 
+// Use the local virtual environment Python
+const PYTHON_PATH = path.join(__dirname, '../../backend/venv/bin/python');
+
 let mainWindow: BrowserWindow | null = null;
 let gestureProcess: ChildProcess | null = null;
 let nfcProcess: ChildProcess | null = null;
@@ -36,7 +39,8 @@ function createWindow() {
     console.log('[MAIN] Window finished loading, starting services');
     startGestureTracking();
     startNFCService();
-    startVoiceTracking();
+    // Voice tracking is now started on demand (via NFC/IPC)
+    // startVoiceTracking();
   });
 }
 
@@ -51,7 +55,7 @@ function startVoiceTracking() {
 
   console.log('[MAIN] Starting voice tracking');
   
-  voiceProcess = spawn('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+  voiceProcess = spawn(PYTHON_PATH, ['-u', scriptPath], {
     cwd: voicePath,
     env: { ...process.env, PYTHONUNBUFFERED: '1' } // Ensure env vars are passed
   });
@@ -104,7 +108,7 @@ function startGestureTracking() {
 
   // Spawn Python process (use full path to ensure correct environment)
   // -u flag forces unbuffered output
-  gestureProcess = spawn('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+  gestureProcess = spawn(PYTHON_PATH, ['-u', scriptPath], {
     cwd: backendPath,
   });
 
@@ -170,7 +174,7 @@ function startNFCService() {
   console.log('[MAIN] Starting NFC service...');
   
   // Reuse same python path for consistency
-  nfcProcess = spawn('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+  nfcProcess = spawn(PYTHON_PATH, ['-u', scriptPath], {
     cwd: backendPath,
   });
 
