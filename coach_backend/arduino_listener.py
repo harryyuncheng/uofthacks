@@ -1,6 +1,6 @@
 import serial
 import time
-from coach_manager import get_or_create_coach
+from coach_manager import get_or_create_user_by_nfc, set_coach_type
 
 # Configure your serial port here. 
 # On Mac it's often /dev/tty.usbmodem... or /dev/tty.usbserial...
@@ -26,17 +26,26 @@ def listen_for_nfc():
                 if line and len(line) >= 8: 
                     print(f"Tag Detected: {line}")
                     
-                    # Initialize or fetch the coach
-                    coach = get_or_create_coach(line)
+                    # Initialize or fetch the user via Totem link
+                    user = get_or_create_user_by_nfc(line)
                     
                     # Log essential info
-                    print(f"Active Coach ID: {coach.get('nfc_id')}")
-                    print(f"Type: {coach.get('coach_type', 'unset')}")
+                    print(f"Active User: {user.get('name')}")
+                    print(f"User ID: {user.get('user_id')}")
+                    print(f"Type: {user.get('coach_type', 'unset')}")
                     
-                    if not coach.get('onboarding_completed'):
+                    if not user.get('onboarding_completed'):
                         print("ACTION REQUIRED: Ask user if they want 'personal' or 'corporate' coaching.")
+                        # Simulating setting it for demo purposes if you want, or wait for voice/UI command
                     else:
-                        print(f"System: {coach.get('system_instruction')}")
+                        print(f"System: {user.get('system_instruction')}")
+                        
+        except KeyboardInterrupt:
+            print("\nStopping NFC Listener...")
+            break
+        except Exception as e:
+            print(f"Error: {e}")
+            time.sleep(1)
                     
         except KeyboardInterrupt:
             print("\nStopping NFC Listener...")
