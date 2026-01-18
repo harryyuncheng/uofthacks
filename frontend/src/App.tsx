@@ -2,6 +2,7 @@ import './App.css'
 import Time from './widgets/Time'
 import Weather from './widgets/Weather'
 import Calendar from './widgets/Calendar'
+import VoiceOrb from './widgets/VoiceOrb'
 import Cursor from './components/Cursor'
 import { useGestureTracking } from './hooks/useGestureTracking'
 import { useEffect, useState, useCallback } from 'react'
@@ -174,6 +175,16 @@ function App() {
         gestureY={hand?.y}
         gestureState={hand?.state}
         gestureDefinitive={hand?.definitive}
+        onPositionUpdate={updateWidgetPosition}
+        checkCollision={checkCollision}
+        getOtherWidgets={getOtherWidgets}
+      />
+      <VoiceOrb 
+        id="orb"
+        gestureX={hand.x}
+        gestureY={hand.y}
+        gestureState={hand.state}
+        gestureDefinitive={hand.definitive}
         onPositionUpdate={updateWidgetPosition}
         checkCollision={checkCollision}
         getOtherWidgets={getOtherWidgets}
