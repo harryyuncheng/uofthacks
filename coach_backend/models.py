@@ -42,6 +42,9 @@ class User(BaseModel):
     system_instruction: str = "You are a coach. Your first task is to ask the user if they want coaching for personal or business/corporate reasons."
     onboarding_completed: bool = False
     
+    # Relationships
+    goal_ids: List[str] = [] # List of Goal UUIDs for quick access
+    
     created_at: datetime = Field(default_factory=datetime.now)
 
     def to_dict(self):

@@ -83,6 +83,12 @@ def create_goal(user_id: str, title: str, description: str = "", deadline: datet
         deadline=deadline
     )
     goals_collection.insert_one(goal.to_dict())
+    
+    # Link goal to user
+    users_collection.update_one(
+        {"user_id": user_id},
+        {"$push": {"goal_ids": goal.goal_id}}
+    )
     return goal
 
 def get_user_goals(user_id: str):

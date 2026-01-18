@@ -32,6 +32,9 @@ Stores the identity, settings, and "Brain" of the coach for a specific person.
   // RAG / Context Memory
   "background": "User is a software engineer interested in marathon training.",
   
+  // Relationships
+  "goal_ids": ["771f9500-...", "882a9600-..."], // List of Goal IDs for quick access
+
   "created_at": "2026-01-17T15:30:00.000Z"
 }
 ```
