@@ -2,6 +2,7 @@ import './App.css'
 import Time from './widgets/Time'
 import Weather from './widgets/Weather'
 import Calendar from './widgets/Calendar'
+import VoiceOrb from './widgets/VoiceOrb'
 import Cursor from './components/Cursor'
 import AudioBorder from './components/AudioBorder'
 import { useGestureTracking } from './hooks/useGestureTracking'
@@ -175,7 +176,7 @@ const checkCollision = useCallback((id: string, x: number, y: number, width: num
         checkCollision={checkCollision}
         getOtherWidgets={getOtherWidgets}
       />
-    </AudioBorder>
+    </div>
   )
 }
 
