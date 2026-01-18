@@ -3,4 +3,8 @@ opencv-contrib-python
 opencv-python
 pillow
 websockets==13.1
+azure-cognitiveservices-speech
+python-dotenv
+openai
+elevenlabs
 
