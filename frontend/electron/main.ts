@@ -6,6 +6,7 @@ const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow: BrowserWindow | null = null;
 let gestureProcess: ChildProcess | null = null;
+let nfcProcess: ChildProcess | null = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -31,8 +32,9 @@ function createWindow() {
 
   // Start gesture tracking automatically when window is ready
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[MAIN] Window finished loading, starting gesture tracking');
+    console.log('[MAIN] Window finished loading, starting services');
     startGestureTracking();
+    startNFCService();
   });
 }
 
@@ -53,7 +55,7 @@ function startGestureTracking() {
 
   // Spawn Python process (use full path to ensure correct environment)
   // -u flag forces unbuffered output
-  gestureProcess = spawn('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
+  gestureProcess = spawn('/Users/dganjali/.pyenv/shims/python', ['-u', scriptPath], {
     cwd: backendPath,
   });
 
@@ -105,6 +107,53 @@ function stopGestureTracking() {
     gestureProcess.kill();
     gestureProcess = null;
   }
+}
+
+function startNFCService() {
+  if (nfcProcess) {
+    console.log('[MAIN] NFC service already running');
+    return;
+  }
+
+  const backendPath = path.join(__dirname, '../../backend');
+  const scriptPath = path.join(backendPath, 'arduino_listener.py');
+
+  console.log('[MAIN] Starting NFC service...');
+  
+  // Reuse same python path for consistency
+  nfcProcess = spawn('/Users/dganjali/.pyenv/shims/python', ['-u', scriptPath], {
+    cwd: backendPath,
+  });
+
+  nfcProcess.stdout?.on('data', (data) => {
+    // Unlike gestures which are high frequency, NFC events are rare.
+    // We can just parse the buffer string directly.
+    const output = data.toString().trim();
+    console.log('[NFC RAW]', output);
+    
+    // It might output multiple JSONs if buffered, so split by newline
+    const lines = output.split('\n');
+    
+    lines.forEach((line: string) => {
+        try {
+            if (!line) return;
+            const jsonData = JSON.parse(line);
+            console.log('[NFC JSON]', jsonData);
+            mainWindow?.webContents.send('nfc-event', jsonData);
+        } catch (e) {
+            console.error('[NFC ERROR] Failed to parse:', line);
+        }
+    });
+  });
+
+  nfcProcess.stderr?.on('data', (data) => {
+    console.log('[NFC DEBUG]', data.toString().trim());
+  });
+  
+  nfcProcess.on('exit', (code) => {
+      console.log(`[MAIN] NFC Process exited code: ${code}`);
+      nfcProcess = null;
+  });
 }
 
 // IPC handlers

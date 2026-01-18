@@ -5,6 +5,7 @@ import Calendar from './widgets/Calendar'
 import Cursor from './components/Cursor'
 import { useGestureTracking } from './hooks/useGestureTracking'
 import { useEffect, useState, useCallback } from 'react'
+import { useNFCListener } from './hooks/useNFCListener'
 
 interface WidgetPosition {
   id: string
@@ -16,7 +17,20 @@ interface WidgetPosition {
 
 function App() {
   const { hand, isConnected } = useGestureTracking()
+  const nfcEvent = useNFCListener();
   const [widgetPositions, setWidgetPositions] = useState<Map<string, WidgetPosition>>(new Map())
+  
+  useEffect(() => {
+     if (nfcEvent) {
+         console.log("App received NFC Event:", nfcEvent);
+         // Visual Feedback or State Logic will go here
+         if (nfcEvent.type === 'session_start') {
+             // Example: Play a sound or change border color
+             // const user = nfcEvent.user;
+             // alert(`Welcome ${user.name}`);
+         }
+     }
+  }, [nfcEvent]);
   
   useEffect(() => {
     console.log('[APP] Mounted - checking window.electron:', !!window.electron);
