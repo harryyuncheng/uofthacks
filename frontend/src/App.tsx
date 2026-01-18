@@ -2,9 +2,10 @@ import './App.css'
 import Time from './widgets/Time'
 import Weather from './widgets/Weather'
 import Calendar from './widgets/Calendar'
+import VoiceOrb from './widgets/VoiceOrb'
 import Cursor from './components/Cursor'
 import { useGestureTracking } from './hooks/useGestureTracking'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 
 interface WidgetPosition {
   id: string
@@ -92,75 +93,12 @@ function App() {
     return { x: adjustedX, y: adjustedY }
   }, [widgetPositions])
 
-  // Audio Analysis for Border Pulse
-  const [audioLevel, setAudioLevel] = useState(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const rafRef = useRef<number>();
-
-  const initAudio = () => {
-    if (!audioRef.current || audioContextRef.current) return;
-
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      const ctx = new AudioContextClass();
-      audioContextRef.current = ctx;
-
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 64;
-      analyserRef.current = analyser;
-
-      const source = ctx.createMediaElementSource(audioRef.current);
-      source.connect(analyser);
-      source.connect(ctx.destination); // Connect to speakers
-      sourceRef.current = source;
-
-      const animate = () => {
-        if (!analyser) return;
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(dataArray);
-
-        // Calc average val
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-        const avg = sum / dataArray.length;
-        // Normalize 0-1 approx
-        const norm = Math.min(avg / 100, 1);
-        
-        setAudioLevel(prev => prev * 0.8 + norm * 0.2); // Smooth
-        rafRef.current = requestAnimationFrame(animate);
-      };
-      animate();
-    } catch (e) {
-      console.error("Audio Context Init Error", e);
-    }
-  };
-
-  // Resume audio context on user interaction if needed (browser policy)
-  useEffect(() => {
-    const handleInteract = () => {
-      audioContextRef.current?.resume();
-    };
-    window.addEventListener('click', handleInteract);
-    return () => window.removeEventListener('click', handleInteract);
-  }, []);
-
   return (
     <div style={{
       width: '100vw',
       height: '100vh',
       backgroundColor: '#000',
-      position: 'relative',
-      overflow: 'hidden',
-      // Dynamic Border Pulsing
-      boxSizing: 'border-box',
-      border: `${10 + audioLevel * 20}px solid rgba(0, 255, 100, ${audioLevel * 0.8})`,
-      transition: 'border 0.1s ease-out',
-      boxShadow: `inset 0 0 ${50 + audioLevel * 100}px rgba(0, 255, 100, ${audioLevel * 0.5})`
+      position: 'relative'
     }}>
       {/* Connection status indicator */}
       <div style={{
@@ -231,8 +169,18 @@ function App() {
         checkCollision={checkCollision}
         getOtherWidgets={getOtherWidgets}
       />
-      <Calendar
-        id="calendar"
+      <Calendar 
+        id="calendar-widget"
+        gestureX={hand?.x}
+        gestureY={hand?.y}
+        gestureState={hand?.state}
+        gestureDefinitive={hand?.definitive}
+        onPositionUpdate={updateWidgetPosition}
+        checkCollision={checkCollision}
+        getOtherWidgets={getOtherWidgets}
+      />
+      <VoiceOrb 
+        id="orb"
         gestureX={hand.x}
         gestureY={hand.y}
         gestureState={hand.state}
@@ -240,15 +188,6 @@ function App() {
         onPositionUpdate={updateWidgetPosition}
         checkCollision={checkCollision}
         getOtherWidgets={getOtherWidgets}
-      />
-
-      {/* Hidden Audio Element for TTS Output and Visualization */}
-      {/* Use this element to play AI responses: audioRef.current.src = '...'; audioRef.current.play(); */}
-      <audio 
-        ref={audioRef} 
-        onPlay={initAudio} 
-        crossOrigin="anonymous" 
-        style={{ display: 'none' }} 
       />
     </div>
   )
