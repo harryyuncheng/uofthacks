@@ -9,7 +9,6 @@ interface WeatherProps {
   gestureDefinitive?: boolean
   onPositionUpdate?: (id: string, position: { id: string, x: number, y: number, width: number, height: number }) => void
   checkCollision?: (id: string, x: number, y: number, width: number, height: number) => { x: number, y: number }
-  getOtherWidgets?: (id: string) => Array<{ id: string, x: number, y: number, width: number, height: number }>
 }
 
 interface WeatherData {
@@ -19,7 +18,7 @@ interface WeatherData {
   icon: string
 }
 
-function Weather({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPositionUpdate, checkCollision, getOtherWidgets }: WeatherProps) {
+function Weather({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPositionUpdate, checkCollision }: WeatherProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -119,7 +118,6 @@ function Weather({ id, gestureX, gestureY, gestureState, gestureDefinitive, onPo
       gestureDefinitive={gestureDefinitive}
       onPositionUpdate={onPositionUpdate}
       checkCollision={checkCollision}
-      getOtherWidgets={getOtherWidgets}
       style={{
         color: 'white',
         fontSize: '12px',

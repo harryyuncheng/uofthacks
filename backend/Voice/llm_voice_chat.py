@@ -1,3 +1,4 @@
+import json
 import os
 import queue
 import time
@@ -77,6 +78,218 @@ def get_complete_utterance(timeout=1):
             
     return " ".join(accumulated_text)
 
+def run_introduction_session(speech_recognizer):
+    print("Starting Introduction Session...")
+    
+    if not OPENROUTER_API_KEY:
+        print("Warning: OPENROUTER_API_KEY not found. LLM features disabled.")
+        return
+
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+    )
+
+    # Specific objectives for the intro session
+    objectives = [
+        "Introduce yourself as Curtis, a helpful friend whose goal is to help the user fulfill their own goals, and immediately ask for the user's name to get to know them.",
+        "Ask the user for a list of their primary goals and what they hope to achieve with your help.",
+        "Smoothly ask if the user has any goals left. If not, then exit the introduction mode, and go to normal coaching mode. Ask the user which goal they'd like to explore first."
+    ]
+
+    # Base system prompt for the persona
+    base_system_prompt = (
+        "In this session, you are meeting the user for the first time. "
+        "Keep the conversation flowing naturally. Be enthusiastic and supportive. "
+        "You are Curtis. "
+        "CRITICAL: Limit your responses to a maximum of 2 sentences at a time. Be concise."
+    )
+
+    conversation_history = [
+        {"role": "system", "content": base_system_prompt}
+    ]
+
+    current_objective_index = 0
+    force_loop_back = False
+
+    while True:
+        try:
+            # Logic to handle looping back from Objective 3 to Objective 2 (shifted indices)
+            # We determine the next objective to inject based on the index
+            if current_objective_index >= len(objectives):
+                print("Introduction objectives complete.")
+                break
+            
+            current_objective_text = objectives[current_objective_index]
+            
+            # Append the current objective to the history as a system instruction
+            # effectively "injecting" it for this turn
+            conversation_history.append({
+                "role": "system", 
+                "content": f"Current Objective: {current_objective_text}"
+            })
+            
+            # --- Generate AI Response ---
+            full_response_container = []
+            
+            def response_generator():
+                print("Assistant is thinking (Intro Mode)...")
+                try:
+                    llm_stream = client.chat.completions.create(
+                        model=OPENROUTER_MODEL,
+                        messages=conversation_history,
+                        stream=True
+                    )
+                    
+                    print("AI: ", end="", flush=True)
+                    for chunk in llm_stream:
+                        if chunk.choices[0].delta.content:
+                            content = chunk.choices[0].delta.content
+                            print(content, end="", flush=True)
+                            full_response_container.append(content)
+                            yield content
+                    print()
+                except Exception as e:
+                    print(f"Error communicating with LLM: {e}")
+
+            # Text-to-Speech logic (same as main)
+            if elevenlabs_client:
+                try:
+                    current_buffer = ""
+                    for chunk in response_generator():
+                        current_buffer += chunk
+                        if len(current_buffer) > 4 and any(current_buffer.endswith(end) for end in [". ", "? ", "! ", ".\n", "?\n", "!\n", ".", "?", "!"]):
+                            audio_stream = elevenlabs_client.text_to_speech.convert(
+                                text=current_buffer,
+                                voice_id="ljX1ZrXuDIIRVcmiVSyR", 
+                                model_id="eleven_turbo_v2_5"
+                            )
+                            stream(audio_stream)
+                            current_buffer = ""
+                    if current_buffer.strip():
+                        audio_stream = elevenlabs_client.text_to_speech.convert(
+                            text=current_buffer,
+                            voice_id="ljX1ZrXuDIIRVcmiVSyR",
+                            model_id="eleven_turbo_v2_5"
+                        )
+                        stream(audio_stream)
+                except Exception as e:
+                    print(f"\nError with ElevenLabs stream: {e}")
+            else:
+                for _ in response_generator(): pass
+
+            assistant_response_text = "".join(full_response_container)
+            conversation_history.append({"role": "assistant", "content": assistant_response_text})
+
+            # Check if we are done with all objectives before asking for user input?
+            # actually we need user input to proceed.
+            
+            # Resume recognition
+            if speech_recognizer:
+                try:
+                    with transcription_queue.mutex:
+                        transcription_queue.queue.clear()
+                    speech_recognizer.start_continuous_recognition_async().get()
+                except Exception:
+                    pass
+
+            # --- Wait for User Input ---
+            user_input = get_complete_utterance()
+            print(f"\nUSER: {user_input}")
+            conversation_history.append({"role": "user", "content": user_input})
+
+            # Stop recognition
+            if speech_recognizer:
+                try:
+                    speech_recognizer.stop_continuous_recognition_async().get()
+                except Exception:
+                    pass
+
+            # --- Background Data Parsing & Flow Control ---
+            # We need to know if we should loop back or proceed.
+            # We launch a thread to parse data (name, goals), and also determine flow.
+            
+            def info_parser_worker(u_text, obj_idx, ai_text):
+                # This function calls LLM to parse extracted info
+                parser_prompt = f"""
+                Analyze the user's input in the context of the conversation.
+                Current Objective Index: {obj_idx}
+                AI Question: {ai_text}
+                User Input: {u_text}
+                
+                Task:
+                1. Extract relevant information (Name, Goal, etc.)
+                2. If Objective Index is 2 (checking for more goals), determine if the user has MORE goals or is DONE.
+                
+                Return JSON format:
+                {{
+                    "extracted_data": {{ ... }},
+                    "flow_control": "CONTINUE" | "LOOP_BACK_TO_GOALS" | "DONE"
+                }}
+                """
+                
+                try:
+                     parse_completion = client.chat.completions.create(
+                        model="google/gemini-2.5-flash-preview-09-2025", # Use a fast model
+                        messages=[{"role": "system", "content": "You are a data extraction backend."},
+                                  {"role": "user", "content": parser_prompt}],
+                        response_format={"type": "json_object"}
+                    )
+                     result = parse_completion.choices[0].message.content
+                     parsed_json = json.loads(result)
+                     print(f"\n[Background Parser] Parsed: {parsed_json}")
+                     
+                     # TODO: Store extracted_data to MongoDB
+                     
+                     return parsed_json
+                except Exception as e:
+                    print(f"Parser error: {e}")
+                    return None
+
+            # For the purpose of flow control, we might need to block or use a shared variable.
+            # Since the user said "Objective 4 might loop back", we need the result of parsing to decide the next step.
+            # The prompt says "background after each response... return data... eventually sent to mongodb".
+            # It implies the *parsing* is background, but *flow* might need to be synchronous effectively.
+            # However, to keep it 'background', we can assume the main thread proceeds unless interrupted.
+            # BUT: If we proceed to the wrong objective, it's bad.
+            # Let's run it synchronously for the decision logic, but "conceptually" it's a background data task.
+            # For this implementation, I will run it and wait for the Loop decision, because the next prompt DEPENDS on it.
+            
+            # NOTE: "gradually work through each of the numbered objectives... appending the objective ... to the llm input"
+            # This means the MAIN loop controls the objectives.
+            
+            parser_result = info_parser_worker(user_input, current_objective_index, assistant_response_text)
+            
+            # Decide next step logic
+            if current_objective_index == 1:
+                # We just asked for goals. Move to check if they have more
+                current_objective_index += 1
+            elif current_objective_index == 2:
+                # We asked if they have more goals.
+                # Check parser result
+                flow = parser_result.get("flow_control", "DONE") if parser_result else "DONE"
+                if flow == "LOOP_BACK_TO_GOALS" or "yes" in user_input.lower(): # Fallback heuristic
+                    # Go back to asking for goals (Index 1)
+                    # Ideally, we should gently ask "What else?" - The objective text at Index 1 is "Ask for list of goals".
+                    # We might want to slightly modify it or just reuse it.
+                    # Or we stay at Index 2 but the AI context updates?
+                    # The prompt says "Objective 3 might loop back to Objective 2".
+                    current_objective_index = 1 
+                else:
+                    # Done with intro
+                    current_objective_index += 1
+            else:
+                # Normal progression
+                current_objective_index += 1
+
+        except KeyboardInterrupt:
+            raise
+        except Exception as e:
+            print(f"Error in intro session: {e}")
+            break
+            
+    print("Exiting Introduction Session.")
+
 def process_conversations(speech_recognizer):
     if not OPENROUTER_API_KEY:
         print("Warning: OPENROUTER_API_KEY not found. LLM features disabled.")
@@ -87,8 +300,15 @@ def process_conversations(speech_recognizer):
         api_key=OPENROUTER_API_KEY,
     )
     
+    # Load system prompt from file
+    try:
+        with open("system_prompt.txt", "r") as f:
+            system_prompt = f.read().strip()
+    except FileNotFoundError:
+        system_prompt = "You are a helpful voice assistant. Keep your responses concise and conversational."
+
     conversation_history = [
-        {"role": "system", "content": "You are a helpful voice assistant. Keep your responses concise and conversational."}
+        {"role": "system", "content": system_prompt}
     ]
 
     print("Ready to chat! Speak into your microphone.")

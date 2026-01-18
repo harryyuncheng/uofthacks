@@ -2,6 +2,7 @@ import './App.css'
 import Time from './widgets/Time'
 import Weather from './widgets/Weather'
 import Calendar from './widgets/Calendar'
+import Checklist from './widgets/Checklist'
 import Cursor from './components/Cursor'
 import { useGestureTracking } from './hooks/useGestureTracking'
 import { useEffect, useState, useCallback } from 'react'
@@ -33,16 +34,6 @@ function App() {
       return updated
     })
   }, [])
-
-  const getOtherWidgets = useCallback((id: string) => {
-    const widgets: WidgetPosition[] = []
-    for (const [otherId, pos] of widgetPositions) {
-      if (otherId !== id) {
-        widgets.push(pos)
-      }
-    }
-    return widgets
-  }, [widgetPositions])
 
   const checkCollision = useCallback((id: string, x: number, y: number, width: number, height: number): { x: number, y: number } => {
     let adjustedX = x
@@ -156,7 +147,6 @@ function App() {
         gestureDefinitive={hand?.definitive}
         onPositionUpdate={updateWidgetPosition}
         checkCollision={checkCollision}
-        getOtherWidgets={getOtherWidgets}
       />
       <Weather 
         id="weather-widget"
@@ -166,7 +156,6 @@ function App() {
         gestureDefinitive={hand?.definitive}
         onPositionUpdate={updateWidgetPosition}
         checkCollision={checkCollision}
-        getOtherWidgets={getOtherWidgets}
       />
       <Calendar 
         id="calendar-widget"
@@ -176,7 +165,15 @@ function App() {
         gestureDefinitive={hand?.definitive}
         onPositionUpdate={updateWidgetPosition}
         checkCollision={checkCollision}
-        getOtherWidgets={getOtherWidgets}
+      />
+      <Checklist
+        id="checklist-widget"
+        gestureX={hand?.x}
+        gestureY={hand?.y}
+        gestureState={hand?.state}
+        gestureDefinitive={hand?.definitive}
+        onPositionUpdate={updateWidgetPosition}
+        checkCollision={checkCollision}
       />
     </div>
   )
