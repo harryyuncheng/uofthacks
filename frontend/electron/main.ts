@@ -104,7 +104,7 @@ function startGestureTracking() {
 
   // Spawn Python process (use full path to ensure correct environment)
   // -u flag forces unbuffered output
-  gestureProcess = spawn('/Users/dganjali/.pyenv/shims/python', ['-u', scriptPath], {
+  gestureProcess = spawn('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
     cwd: backendPath,
   });
 
@@ -170,7 +170,7 @@ function startNFCService() {
   console.log('[MAIN] Starting NFC service...');
   
   // Reuse same python path for consistency
-  nfcProcess = spawn('/Users/dganjali/.pyenv/shims/python', ['-u', scriptPath], {
+  nfcProcess = spawn('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
     cwd: backendPath,
   });
 
@@ -224,7 +224,7 @@ function startVoiceService(prompt: string, greeting: string) {
   console.log('[MAIN] Starting voice service...');
   console.log('[MAIN] Greeting:', greeting);
 
-  voiceProcess = spawn('/Users/dganjali/.pyenv/shims/python', [
+  voiceProcess = spawn('/Users/harry/anaconda3/bin/python', [
     '-u', 
     scriptPath, 
     '--prompt', prompt,

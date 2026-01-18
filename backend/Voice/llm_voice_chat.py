@@ -17,10 +17,6 @@ from dotenv import load_dotenv, find_dotenv
 from elevenlabs import stream
 from elevenlabs.client import ElevenLabs
 
-# Use simpleaudio for playback as a fallback if mpv fails in 'stream'
-import simpleaudio as sa
-from pydub import AudioSegment
-
 # Load environment variables (look in root/parent dirs)
 load_dotenv()
 if not os.getenv("ELEVENLABS_API_KEY"):
@@ -361,7 +357,12 @@ def run_introduction_session(speech_recognizer):
                 # We asked if they have more goals.
                 # Check parser result
                 flow = parser_result.get("flow_control", "DONE") if parser_result else "DONE"
-                if flow == "LOOP_BACK_TO_GOALS" or "yes" in user_input.lower(): # Fallback heuristic
+                
+                # Check for explicit confirmation of more goals in user input
+                u_in = user_input.lower()
+                user_indicates_more = "yes" in u_in or "another" in u_in or "one more" in u_in or "also" in u_in
+
+                if flow == "LOOP_BACK_TO_GOALS" or (user_indicates_more and "no" not in u_in):
                     # Go back to asking for goals (Index 2)
                     current_objective_index = 2
                 else:
@@ -378,8 +379,9 @@ def run_introduction_session(speech_recognizer):
             break
             
     print("Exiting Introduction Session.")
+    return conversation_history
 
-def process_conversations(speech_recognizer):
+def process_conversations(speech_recognizer, greeting=None, initial_history=None):
     if not OPENROUTER_API_KEY:
         print("Warning: OPENROUTER_API_KEY not found. LLM features disabled.")
         return
@@ -396,29 +398,45 @@ def process_conversations(speech_recognizer):
     except FileNotFoundError:
         system_prompt = "You are a helpful voice assistant. Keep your responses concise and conversational."
 
-    conversation_history = [
-        {"role": "system", "content": system_prompt}
-    ]
-
-    print("Ready to chat! Speak into your microphone.")
-
-    # Speak greeting if provided
-    if greeting:
-        print(f"AI (Greeting): {greeting}")
-        if elevenlabs_client:
-            try:
-                # Use text_to_speech.convert which returns a generator of bytes
-                audio_stream = elevenlabs_client.text_to_speech.convert(
-                    text=greeting,
-                    voice_id="ljX1ZrXuDIIRVcmiVSyR", 
-                    model_id="eleven_turbo_v2_5"
-                )
-                # Consume generator (stream) into full bytes for simpleaudio playback
-                play_audio_bytes(b"".join(audio_stream))
-            except Exception as e:
-                print(f"Greeting Audio Error: {e}")
-        conversation_history.append({"role": "assistant", "content": greeting})
+    conversation_history = []
     
+    if initial_history:
+        # Carry over the history but inject the new system prompt
+        conversation_history = initial_history
+        conversation_history.append({"role": "system", "content": "You are transitioning to normal conversation mode. Stop checking for introduction objectives. " + system_prompt})
+        print("Ready to chat! Speak into your microphone.")
+    else:
+        conversation_history = [
+            {"role": "system", "content": system_prompt}
+        ]
+
+        print("Ready to chat! Speak into your microphone.")
+
+        # Speak greeting if provided
+        if greeting:
+            print(f"AI (Greeting): {greeting}")
+            if elevenlabs_client:
+                try:
+                    # Use text_to_speech.convert which returns a generator of bytes
+                    audio_stream = elevenlabs_client.text_to_speech.convert(
+                        text=greeting,
+                        voice_id="ljX1ZrXuDIIRVcmiVSyR", 
+                        model_id="eleven_turbo_v2_5"
+                    )
+                    stream(audio_stream)
+                except Exception as e:
+                    print(f"Greeting Audio Error: {e}")
+            conversation_history.append({"role": "assistant", "content": greeting})
+    
+    # Ensure recognition is running before starting the loop
+    if speech_recognizer:
+        try:
+            with transcription_queue.mutex:
+                transcription_queue.queue.clear()
+            speech_recognizer.start_continuous_recognition_async().get()
+        except Exception as e:
+            print(f"Failed to start recognition: {e}")
+
     while True:
         try:
             # 1. Speech to Text: Wait for full utterance
@@ -473,8 +491,7 @@ def process_conversations(speech_recognizer):
                                 voice_id="ljX1ZrXuDIIRVcmiVSyR", 
                                 model_id="eleven_turbo_v2_5"
                             )
-                            # Consume generator
-                            play_audio_bytes(b"".join(audio_stream))
+                            stream(audio_stream)
                             current_buffer = ""
                     
                     # Play any remaining text
@@ -484,7 +501,7 @@ def process_conversations(speech_recognizer):
                             voice_id="ljX1ZrXuDIIRVcmiVSyR",
                             model_id="eleven_turbo_v2_5"
                         )
-                        play_audio_bytes(b"".join(audio_stream))
+                        stream(audio_stream)
                 except Exception as e:
                     print(f"\nError with ElevenLabs stream: {e}")
 
@@ -526,13 +543,13 @@ def main():
         speech_recognizer.start_continuous_recognition()
         
         # 1. Wait for wake word
-        wait_for_wake_word(recognizer)
+        wait_for_wake_word(speech_recognizer)
 
         # 2. Run the onboarding conversation
-        run_introduction_session(recognizer)
+        history = run_introduction_session(speech_recognizer)
         
         # Optionally fall through to normal conversation if needed
-        process_conversations(recognizer)
+        process_conversations(speech_recognizer, greeting=args.greeting, initial_history=history)
         
     except KeyboardInterrupt:
         print("\nStopping...")

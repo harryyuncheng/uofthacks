@@ -93,7 +93,7 @@ function startGestureTracking() {
     console.log('[MAIN] __dirname:', __dirname);
     // Spawn Python process (use full path to ensure correct environment)
     // -u flag forces unbuffered output
-    gestureProcess = (0, child_process_1.spawn)('/Users/dganjali/.pyenv/shims/python', ['-u', scriptPath], {
+    gestureProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
         cwd: backendPath,
     });
     // Handle stdout (gesture data)
@@ -147,7 +147,7 @@ function startNFCService() {
     const scriptPath = path_1.default.join(backendPath, 'arduino_listener.py');
     console.log('[MAIN] Starting NFC service...');
     // Reuse same python path for consistency
-    nfcProcess = (0, child_process_1.spawn)('/Users/dganjali/.pyenv/shims/python', ['-u', scriptPath], {
+    nfcProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', ['-u', scriptPath], {
         cwd: backendPath,
     });
     nfcProcess.stdout?.on('data', (data) => {
@@ -194,7 +194,7 @@ function startVoiceService(prompt, greeting) {
     const scriptPath = path_1.default.join(backendPath, 'Voice/llm_voice_chat.py');
     console.log('[MAIN] Starting voice service...');
     console.log('[MAIN] Greeting:', greeting);
-    voiceProcess = (0, child_process_1.spawn)('/Users/dganjali/.pyenv/shims/python', [
+    voiceProcess = (0, child_process_1.spawn)('/Users/harry/anaconda3/bin/python', [
         '-u',
         scriptPath,
         '--prompt', prompt,
