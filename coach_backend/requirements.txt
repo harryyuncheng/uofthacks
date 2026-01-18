@@ -1,0 +1,6 @@
+pymongo
+python-dotenv
+pydantic
+pyserial
+dnspython
+certifi
