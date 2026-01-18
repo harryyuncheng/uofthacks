@@ -1,0 +1,6 @@
+sounddevice
+scipy
+openai-whisper
+vosk
+google-generativeai
+# outside venv; choco install ffmpeg -y
